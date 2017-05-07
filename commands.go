@@ -3,7 +3,7 @@ package saved_gifs_bot
 import (
 	"fmt"
 
-	"github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/yi-jiayu/telegram-bot-api"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
@@ -13,24 +13,24 @@ type messageHandler func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgb
 
 var commands = map[string]messageHandler{
 	"newpack": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
-		user := fmt.Sprintf("%d", message.From.ID)
+		user := message.From.ID
 		chatId := message.Chat.ID
 		name := message.CommandArguments()
 
 		var text string
-		created, err := NewList(ctx, name, user)
+		created, err := NewPack(ctx, name, user)
 		if err != nil {
 			if err == ErrInvalidName {
-				text = "Oh no! That was not a valid list name. A list name can only contain letters, numbers, hyphens and underscores."
+				text = "Oh no! That was not a valid pack name. A pack name can only contain letters, numbers, hyphens and underscores."
 			} else {
 				log.Errorf(ctx, "%v", err)
 				text = fmt.Sprintf("Oh no! Something went wrong. Request Id: %s", appengine.RequestID(ctx))
 			}
 		} else {
 			if created {
-				text = "Great! Your gif list has been created."
+				text = "Great! Your gif pack has been created."
 			} else {
-				text = "Oh no! That list name has already been taken. Can you think of another one?"
+				text = "Oh no! That pack name has already been taken. Can you think of another one?"
 			}
 		}
 
@@ -41,23 +41,23 @@ var commands = map[string]messageHandler{
 		}
 	},
 	"mypacks": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
-		user := fmt.Sprintf("%d", message.From.ID)
+		user := message.From.ID
 		chatId := message.Chat.ID
 
 		var text string
-		lists, err := MyLists(ctx, user)
+		packs, err := MyPacks(ctx, user)
 		if err != nil {
 			log.Errorf(ctx, "%v", err)
 			text = fmt.Sprintf("Oh no! Something went wrong. Request Id: %s", appengine.RequestID(ctx))
 		} else {
-			if len(lists) > 0 {
-				text = "Here are the lists you have created: \n"
+			if len(packs) > 0 {
+				text = "Here are the gif packs you have created: \n"
 
-				for i, list := range lists {
+				for i, list := range packs {
 					text += fmt.Sprintf("%d. %s\n", i+1, list.Name)
 				}
 			} else {
-				text = "Oops! It looks like you haven't created any lists yet."
+				text = "Oops! It looks like you haven't created any gif packs yet."
 			}
 		}
 
@@ -68,24 +68,24 @@ var commands = map[string]messageHandler{
 		}
 	},
 	"subscribe": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
-		user := fmt.Sprintf("%d", message.From.ID)
+		user := message.From.ID
 		chatId := message.Chat.ID
 
 		var text string
-		list := message.CommandArguments()
-		subscribed, err := Subscribe(ctx, list, user)
+		pack := message.CommandArguments()
+		subscribed, err := Subscribe(ctx, pack, user)
 		if err != nil {
 			if err == ErrNotFound {
-				text = "Oops! There doesn't seem to be any list with that name."
+				text = "Oops! There doesn't seem to be any gif pack with that name."
 			} else {
 				log.Errorf(ctx, "%v", err)
 				text = fmt.Sprintf("Oh no! Something went wrong. Request Id: %s", appengine.RequestID(ctx))
 			}
 		} else {
 			if subscribed {
-				text = "Great! You have been subscribed to this list!"
+				text = "Great! You have been subscribed to this gif pack!"
 			} else {
-				text = "Don't worry, you are already subscribed to this list!"
+				text = "Don't worry, you are already subscribed to this gif pack!"
 			}
 		}
 
@@ -96,24 +96,24 @@ var commands = map[string]messageHandler{
 		}
 	},
 	"unsubscribe": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
-		user := fmt.Sprintf("%d", message.From.ID)
+		user := message.From.ID
 		chatId := message.Chat.ID
 
 		var text string
-		list := message.CommandArguments()
-		unsubscribed, err := Unsubscribe(ctx, list, user)
+		pack := message.CommandArguments()
+		unsubscribed, err := Unsubscribe(ctx, pack, user)
 		if err != nil {
 			if err == ErrInvalidName {
-				text = "Oh no! That was not a valid list name. List names can only contain letter, numbers, hyphens and underscores."
+				text = "Oh no! That was not a valid pack name. Pack names can only contain letter, numbers, hyphens and underscores."
 			} else {
 				log.Errorf(ctx, "%v", err)
 				text = fmt.Sprintf("Oh no! Something went wrong. Request Id: %s", appengine.RequestID(ctx))
 			}
 		} else {
 			if unsubscribed {
-				text = "Great! You have been unsubscribed from that list."
+				text = "Great! You have been unsubscribed from that gif pack."
 			} else {
-				text = "Don't worry, it seems like you were never subscribed to that list in the first place."
+				text = "Don't worry, it seems like you were never subscribed to that gif pack in the first place."
 			}
 		}
 
@@ -124,7 +124,7 @@ var commands = map[string]messageHandler{
 		}
 	},
 	"subscriptions": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
-		user := fmt.Sprintf("%d", message.From.ID)
+		user := message.From.ID
 		chatId := message.Chat.ID
 
 		var text string
@@ -137,7 +137,7 @@ var commands = map[string]messageHandler{
 				text = "Here are the lists you are currently subscribed to: \n"
 
 				for i, subscription := range subscriptions {
-					text += fmt.Sprintf("%d. %s\n", i+1, subscription.List)
+					text += fmt.Sprintf("%d. %s\n", i+1, subscription.Pack)
 				}
 			} else {
 				text = "Oops! It looks like you haven't subscribed to any lists yet."

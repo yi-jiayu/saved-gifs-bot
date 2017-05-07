@@ -18,49 +18,49 @@ const (
 
 // app engine datastore kinds
 const (
-	listKind         = "List"
+	packKind         = "Pack"
 	subscriptionKind = "Subscription"
 )
 
 var (
 	collapseWhitespaceRegex = regexp.MustCompile(`\s+`)
-	listNameRegex           = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+	packNameRegex           = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 )
 
 // exported errors
 var (
 	ErrInvalidName = errors.New("invalid name")
 	ErrNotAllowed  = errors.New("not allowed")
-	ErrNotFound    = errors.New("list not found")
+	ErrNotFound    = errors.New("pack not found")
 )
 
 type Gif struct {
-	List     search.Atom
+	Pack     search.Atom
 	FileID   search.Atom
 	Keywords string
 }
 
-type List struct {
+type Pack struct {
 	Name    string
-	Creator string
+	Creator int
 }
 
 type Subscription struct {
-	User string
-	List string
+	User int
+	Pack string
 }
 
-// Returns true if list was created, false if a list with the same name already exists.
-func NewList(ctx context.Context, name, creator string) (bool, error) {
-	// validate list name
-	if !listNameRegex.MatchString(name) {
+// Returns true if pack was created, false if a pack with the same name already exists.
+func NewPack(ctx context.Context, name string, creator int) (bool, error) {
+	// validate pack name
+	if !packNameRegex.MatchString(name) {
 		return false, ErrInvalidName
 	}
 
-	// check if name name is already taken
-	var list List
-	key := datastore.NewKey(ctx, listKind, name, 0, nil)
-	err := datastore.Get(ctx, key, &list)
+	// check if pack name is already taken
+	var pack Pack
+	key := datastore.NewKey(ctx, packKind, name, 0, nil)
+	err := datastore.Get(ctx, key, &pack)
 	if err != nil {
 		if err != datastore.ErrNoSuchEntity {
 			return false, err
@@ -69,12 +69,12 @@ func NewList(ctx context.Context, name, creator string) (bool, error) {
 		return false, nil
 	}
 
-	list = List{
+	pack = Pack{
 		Name:    name,
 		Creator: creator,
 	}
 
-	_, err = datastore.Put(ctx, key, &list)
+	_, err = datastore.Put(ctx, key, &pack)
 	if err != nil {
 		return false, err
 	}
@@ -82,31 +82,52 @@ func NewList(ctx context.Context, name, creator string) (bool, error) {
 	return true, nil
 }
 
-// Returns a slice of lists which were created by creator
-func MyLists(ctx context.Context, creator string) ([]List, error) {
-	q := datastore.NewQuery(listKind).Filter("Creator =", creator)
+// Returns a slice of packs which were created by creator
+func MyPacks(ctx context.Context, creator int) ([]Pack, error) {
+	q := datastore.NewQuery(packKind).Filter("Creator =", creator)
 
-	var lists []List
-	_, err := q.GetAll(ctx, &lists)
+	var packs []Pack
+	_, err := q.GetAll(ctx, &packs)
 	if err != nil {
 		return nil, err
 	}
 
-	return lists, nil
+	return packs, nil
 }
 
-// Returns true if user was successfully subscribed to list, false if user was already subscribed to list.
-// Returns ErrNotFound if list does not exist.
-func Subscribe(ctx context.Context, list, user string) (bool, error) {
-	// validate list name
-	if !listNameRegex.MatchString(list) {
+// Retrieves information about a specific gif pack
+func GetPack(ctx context.Context, name string) (Pack, error) {
+	// validate pack name
+	if !packNameRegex.MatchString(name) {
+		return Pack{}, ErrInvalidName
+	}
+
+	key := datastore.NewKey(ctx, packKind, name, 0, nil)
+	var pack Pack
+	err := datastore.Get(ctx, key, &pack)
+	if err != nil {
+		if err == datastore.ErrNoSuchEntity {
+			return Pack{}, ErrNotFound
+		} else {
+			return Pack{}, err
+		}
+	}
+
+	return pack, nil
+}
+
+// Returns true if user was successfully subscribed to pack, false if user was already subscribed to pack.
+// Returns ErrNotFound if pack does not exist.
+func Subscribe(ctx context.Context, pack string, user int) (bool, error) {
+	// validate pack name
+	if !packNameRegex.MatchString(pack) {
 		return false, ErrInvalidName
 	}
 
-	// check if list exists
-	var l List
-	key := datastore.NewKey(ctx, listKind, list, 0, nil)
-	err := datastore.Get(ctx, key, &l)
+	// check if pack exists
+	var p Pack
+	key := datastore.NewKey(ctx, packKind, pack, 0, nil)
+	err := datastore.Get(ctx, key, &p)
 	if err != nil {
 		if err == datastore.ErrNoSuchEntity {
 			return false, ErrNotFound
@@ -116,7 +137,7 @@ func Subscribe(ctx context.Context, list, user string) (bool, error) {
 	}
 
 	// check if user is already subscribed
-	q := datastore.NewQuery(subscriptionKind).Filter("User =", user).Filter("List =", list)
+	q := datastore.NewQuery(subscriptionKind).Filter("User =", user).Filter("Pack =", pack)
 
 	var subscriptions []Subscription
 	_, err = q.GetAll(ctx, &subscriptions)
@@ -130,7 +151,7 @@ func Subscribe(ctx context.Context, list, user string) (bool, error) {
 
 	subscription := Subscription{
 		User: user,
-		List: list,
+		Pack: pack,
 	}
 
 	key = datastore.NewIncompleteKey(ctx, subscriptionKind, nil)
@@ -142,16 +163,16 @@ func Subscribe(ctx context.Context, list, user string) (bool, error) {
 	return true, nil
 }
 
-// Returns true if user was successfully unsubscribed from list, false if user was not subscribed to list.
-// err will be ErrInvalidName if list is not a valid list name
-func Unsubscribe(ctx context.Context, list, user string) (bool, error) {
-	// validate list name
-	if !listNameRegex.MatchString(list) {
+// Returns true if user was successfully unsubscribed from pack, false if user was not subscribed to pack.
+// err will be ErrInvalidName if pack is not a valid pack name
+func Unsubscribe(ctx context.Context, pack string, user int) (bool, error) {
+	// validate pack name
+	if !packNameRegex.MatchString(pack) {
 		return false, ErrInvalidName
 	}
 
 	// check if user is already subscribed
-	q := datastore.NewQuery(subscriptionKind).Filter("User =", user).Filter("List =", list)
+	q := datastore.NewQuery(subscriptionKind).Filter("User =", user).Filter("Pack =", pack)
 
 	var keys []*datastore.Key
 	var subscriptions []Subscription
@@ -175,7 +196,7 @@ func Unsubscribe(ctx context.Context, list, user string) (bool, error) {
 	return true, nil
 }
 
-func MySubscriptions(ctx context.Context, user string) ([]Subscription, error) {
+func MySubscriptions(ctx context.Context, user int) ([]Subscription, error) {
 	q := datastore.NewQuery(subscriptionKind).Filter("User =", user)
 
 	var subscriptions []Subscription
@@ -187,16 +208,16 @@ func MySubscriptions(ctx context.Context, user string) ([]Subscription, error) {
 	return subscriptions, nil
 }
 
-func NewGif(ctx context.Context, list, user string, gif Gif) error {
-	// validate list name
-	if !listNameRegex.MatchString(list) {
+func NewGif(ctx context.Context, pack string, user int, gif Gif) error {
+	// validate pack name
+	if !packNameRegex.MatchString(pack) {
 		return ErrInvalidName
 	}
 
-	// check that user is the creator of list
-	var l List
-	key := datastore.NewKey(ctx, listKind, list, 0, nil)
-	err := datastore.Get(ctx, key, &l)
+	// check that user is the creator of pack
+	var p Pack
+	key := datastore.NewKey(ctx, packKind, pack, 0, nil)
+	err := datastore.Get(ctx, key, &p)
 	if err != nil {
 		if err == datastore.ErrNoSuchEntity {
 			return ErrNotFound
@@ -205,7 +226,7 @@ func NewGif(ctx context.Context, list, user string, gif Gif) error {
 		}
 	}
 
-	if user != l.Creator {
+	if user != p.Creator {
 		return ErrNotAllowed
 	}
 
@@ -222,8 +243,8 @@ func NewGif(ctx context.Context, list, user string, gif Gif) error {
 	return nil
 }
 
-func SearchGifs(ctx context.Context, user, query string) ([]Gif, error) {
-	// get all lists user is subscribed to
+func SearchGifs(ctx context.Context, user int, query string) ([]Gif, error) {
+	// get all packs user is subscribed to
 	q := datastore.NewQuery(subscriptionKind).Filter("User =", user)
 
 	var subscriptions []Subscription
@@ -232,7 +253,7 @@ func SearchGifs(ctx context.Context, user, query string) ([]Gif, error) {
 		return nil, err
 	}
 
-	// if the user is not subscribed to any lists, return an empty slice and no error
+	// if the user is not subscribed to any packs, return an empty slice and no error
 	if len(subscriptions) == 0 {
 		return nil, nil
 	}
@@ -245,10 +266,10 @@ func SearchGifs(ctx context.Context, user, query string) ([]Gif, error) {
 
 	var results []Gif
 	for _, s := range subscriptions {
-		q := fmt.Sprintf("List = %s AND Keywords = (%s)", s.List, strings.Join(collapseWhitespaceRegex.Split(query, -1), " OR "))
-		for u := gIndex.Search(ctx, q, nil); ; {
-			var g Gif
-			_, err := u.Next(&g)
+		q := fmt.Sprintf("Pack = %s AND Keywords = (%s)", s.Pack, strings.Join(collapseWhitespaceRegex.Split(query, -1), " OR "))
+		for t := gIndex.Search(ctx, q, nil); ; {
+			var gif Gif
+			_, err := t.Next(&gif)
 			if err != nil {
 				if err == search.Done {
 					break
@@ -257,7 +278,7 @@ func SearchGifs(ctx context.Context, user, query string) ([]Gif, error) {
 				}
 			}
 
-			results = append(results, g)
+			results = append(results, gif)
 		}
 	}
 
