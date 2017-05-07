@@ -2,13 +2,16 @@ package saved_gifs_bot
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 
 	"github.com/yi-jiayu/telegram-bot-api"
+	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/search"
 	"google.golang.org/appengine/urlfetch"
 )
 
@@ -65,8 +68,57 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 
 	if message := update.Message; message != nil {
 		if command := message.Command(); command != "" {
-			if handler, exists := commands[command]; exists {
-				handler(ctx, &bot, message)
+			if handler, exists := commandHandlers[command]; exists {
+				err := handler(ctx, &bot, message)
+				if err != nil {
+					SomethingWentWrong(ctx, &bot, message, err)
+				}
+			}
+		} else if document := message.Document; document != nil {
+			if handler, exists := documentHandlers[document.MimeType]; exists {
+				err := handler(ctx, &bot, message)
+				if err != nil {
+					SomethingWentWrong(ctx, &bot, message, err)
+				}
+			}
+		} else if message.Text != "" {
+			var textHandler MessageHandler = func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
+				chatId := message.Chat.ID
+				userId := message.From.ID
+				text := message.Text
+
+				state, err := GetConversationState(ctx, chatId, userId)
+				if err != nil {
+					return err
+				}
+
+				// continuation of newgif
+				if state["action"] == "newgif" && state["pack"] != "" && state["fileId"] != "" {
+					pack := state["pack"]
+					gif := Gif{
+						FileID:   search.Atom(state["fileId"]),
+						Keywords: text,
+					}
+
+					err := NewGif(ctx, pack, userId, gif)
+					if err != nil {
+						return err
+					}
+
+					text := "Great! A new gif has been added to your gif pack."
+					reply := tgbotapi.NewMessage(chatId, text)
+					_, err = bot.Send(reply)
+					if err != nil {
+						return err
+					}
+				}
+
+				return nil
+			}
+
+			err := textHandler(ctx, &bot, message)
+			if err != nil {
+				log.Errorf(ctx, "%v", err)
 			}
 		}
 	} else if inlineQuery := update.InlineQuery; inlineQuery != nil {
@@ -87,6 +139,17 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 			log.Errorf(ctx, "%v", resp)
 			log.Errorf(ctx, "%v", err)
 		}
+	}
+}
+
+func SomethingWentWrong(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message, err error) {
+	log.Errorf(ctx, "%v", err)
+	text := fmt.Sprintf("Oh no! Something went wrong. Request Id: `%s`", appengine.RequestID(ctx))
+	reply := tgbotapi.NewMessage(message.Chat.ID, text)
+	reply.ParseMode = "markdown"
+	_, err2 := bot.Send(reply)
+	if err2 != nil {
+		log.Errorf(ctx, "%v", err2)
 	}
 }
 

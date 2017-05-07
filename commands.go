@@ -5,14 +5,10 @@ import (
 
 	"github.com/yi-jiayu/telegram-bot-api"
 	"golang.org/x/net/context"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/log"
 )
 
-type messageHandler func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message)
-
-var commands = map[string]messageHandler{
-	"newpack": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
+var commandHandlers = map[string]MessageHandler{
+	"newpack": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
 		user := message.From.ID
 		chatId := message.Chat.ID
 		name := message.CommandArguments()
@@ -23,8 +19,7 @@ var commands = map[string]messageHandler{
 			if err == ErrInvalidName {
 				text = "Oh no! That was not a valid pack name. A pack name can only contain letters, numbers, hyphens and underscores."
 			} else {
-				log.Errorf(ctx, "%v", err)
-				text = fmt.Sprintf("Oh no! Something went wrong. Request Id: %s", appengine.RequestID(ctx))
+				return err
 			}
 		} else {
 			if created {
@@ -37,18 +32,19 @@ var commands = map[string]messageHandler{
 		reply := tgbotapi.NewMessage(chatId, text)
 		_, err = bot.Send(reply)
 		if err != nil {
-			log.Errorf(ctx, "%v", err)
+			return err
 		}
+
+		return nil
 	},
-	"mypacks": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
+	"mypacks": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
 		user := message.From.ID
 		chatId := message.Chat.ID
 
 		var text string
 		packs, err := MyPacks(ctx, user)
 		if err != nil {
-			log.Errorf(ctx, "%v", err)
-			text = fmt.Sprintf("Oh no! Something went wrong. Request Id: %s", appengine.RequestID(ctx))
+			return err
 		} else {
 			if len(packs) > 0 {
 				text = "Here are the gif packs you have created: \n"
@@ -64,10 +60,12 @@ var commands = map[string]messageHandler{
 		reply := tgbotapi.NewMessage(chatId, text)
 		_, err = bot.Send(reply)
 		if err != nil {
-			log.Errorf(ctx, "%v", err)
+			return err
 		}
+
+		return nil
 	},
-	"subscribe": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
+	"subscribe": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
 		user := message.From.ID
 		chatId := message.Chat.ID
 
@@ -78,8 +76,7 @@ var commands = map[string]messageHandler{
 			if err == ErrNotFound {
 				text = "Oops! There doesn't seem to be any gif pack with that name."
 			} else {
-				log.Errorf(ctx, "%v", err)
-				text = fmt.Sprintf("Oh no! Something went wrong. Request Id: %s", appengine.RequestID(ctx))
+				return err
 			}
 		} else {
 			if subscribed {
@@ -92,10 +89,12 @@ var commands = map[string]messageHandler{
 		reply := tgbotapi.NewMessage(chatId, text)
 		_, err = bot.Send(reply)
 		if err != nil {
-			log.Errorf(ctx, "%v", err)
+			return err
 		}
+
+		return nil
 	},
-	"unsubscribe": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
+	"unsubscribe": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
 		user := message.From.ID
 		chatId := message.Chat.ID
 
@@ -106,8 +105,7 @@ var commands = map[string]messageHandler{
 			if err == ErrInvalidName {
 				text = "Oh no! That was not a valid pack name. Pack names can only contain letter, numbers, hyphens and underscores."
 			} else {
-				log.Errorf(ctx, "%v", err)
-				text = fmt.Sprintf("Oh no! Something went wrong. Request Id: %s", appengine.RequestID(ctx))
+				return err
 			}
 		} else {
 			if unsubscribed {
@@ -120,18 +118,19 @@ var commands = map[string]messageHandler{
 		reply := tgbotapi.NewMessage(chatId, text)
 		_, err = bot.Send(reply)
 		if err != nil {
-			log.Errorf(ctx, "%v", err)
+			return err
 		}
+
+		return nil
 	},
-	"subscriptions": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
+	"subscriptions": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
 		user := message.From.ID
 		chatId := message.Chat.ID
 
 		var text string
 		subscriptions, err := MySubscriptions(ctx, user)
 		if err != nil {
-			log.Errorf(ctx, "%v", err)
-			text = fmt.Sprintf("Oh no! Something went wrong. Request Id: %s", appengine.RequestID(ctx))
+			return err
 		} else {
 			if len(subscriptions) > 0 {
 				text = "Here are the lists you are currently subscribed to: \n"
@@ -147,7 +146,80 @@ var commands = map[string]messageHandler{
 		reply := tgbotapi.NewMessage(chatId, text)
 		_, err = bot.Send(reply)
 		if err != nil {
-			log.Errorf(ctx, "%v", err)
+			return err
 		}
+
+		return err
+	},
+	"newgif": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
+		user := message.From.ID
+		chatId := message.Chat.ID
+
+		var reply tgbotapi.MessageConfig
+		packName := message.CommandArguments()
+
+		if packName != "" {
+			pack, err := GetPack(ctx, packName)
+			if err != nil {
+				if err == ErrNotFound {
+					text := "Oh no! That pack does not exist. Did you spell it correctly?"
+					reply = tgbotapi.NewMessage(chatId, text)
+				} else {
+					return err
+				}
+			} else {
+				if pack.Creator == user {
+					state := map[string]string{
+						"action": "newgif",
+						"pack":   packName,
+					}
+					err := SetConversationState(ctx, chatId, user, state)
+					if err != nil {
+						return err
+					} else {
+						text := "Please send me the gif you want to add to this pack."
+						reply = tgbotapi.NewMessage(chatId, text)
+						reply.ReplyToMessageID = message.MessageID
+						if !message.Chat.IsPrivate() {
+							reply.ReplyMarkup = tgbotapi.ForceReply{
+								ForceReply: true,
+								Selective:  true,
+							}
+						}
+					}
+				} else {
+					text := "Oops, it seems like you are not the creator of this pack. Only the pack creator can add gifs to a pack."
+					reply = tgbotapi.NewMessage(chatId, text)
+				}
+			}
+
+		} else {
+			state := map[string]string{
+				"action": "newgif",
+			}
+			err := SetConversationState(ctx, chatId, user, state)
+			if err != nil {
+				return err
+			} else {
+				text := "Which pack do you want to add a new gif to?"
+				reply = tgbotapi.NewMessage(chatId, text)
+				reply.ReplyToMessageID = message.MessageID
+				if !message.Chat.IsPrivate() {
+					reply.ReplyMarkup = tgbotapi.ForceReply{
+						ForceReply: true,
+						Selective:  true,
+					}
+				}
+			}
+		}
+
+		_, err := bot.Send(reply)
+		if err != nil {
+			return err
+		}
+
+		return nil
 	},
 }
+
+type MessageHandler func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error
