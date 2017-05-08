@@ -15,9 +15,10 @@ var Transduce MessageHandler = func(ctx context.Context, bot *tgbotapi.BotAPI, m
 		return err
 	}
 
+	done := false
+
 	switch {
-	// newgif waiting for pack name
-	case state["action"] == "newgif" && state["pack"] == "":
+	case state["action"] == "newgif" && state["pack"] == "": // newgif waiting for pack name
 		user := message.From.ID
 		chatId := message.Chat.ID
 
@@ -67,11 +68,7 @@ var Transduce MessageHandler = func(ctx context.Context, bot *tgbotapi.BotAPI, m
 		if err != nil {
 			return err
 		}
-
-		return nil
-
-		// newgif waiting for gif
-	case state["action"] == "newgif" && state["pack"] != "" && state["fileId"] == "":
+	case state["action"] == "newgif" && state["pack"] != "" && state["fileId"] == "": // newgif waiting for gif
 		var reply tgbotapi.MessageConfig
 		if document := message.Document; document != nil {
 			state["fileId"] = document.FileID
@@ -100,13 +97,8 @@ var Transduce MessageHandler = func(ctx context.Context, bot *tgbotapi.BotAPI, m
 		if err != nil {
 			return err
 		}
-
-		return nil
-
-		// newgif waiting for keywords
-	case state["action"] == "newgif" && state["pack"] != "" && state["fileId"] != "":
+	case state["action"] == "newgif" && state["pack"] != "" && state["fileId"] != "": // newgif waiting for keywords
 		var reply tgbotapi.MessageConfig
-		done := false
 		if text := message.Text; text != "" {
 			pack := state["pack"]
 			gif := Gif{
@@ -144,16 +136,136 @@ var Transduce MessageHandler = func(ctx context.Context, bot *tgbotapi.BotAPI, m
 			return err
 		}
 
-		if done {
-			// clear state now that we are done with this flow
-			state = nil
-			err = SetConversationState(ctx, chatId, userId, state)
+		return nil
+	case state["action"] == "newpack": // newpack waiting for pack name
+		var text string
+		if packName := message.Text; packName != "" {
+			created, err := NewPack(ctx, packName, userId)
 			if err != nil {
-				return err
+				if err == ErrInvalidName {
+					text = "Oh no! That was not a valid pack name. A pack name can only contain letters, numbers, hyphens and underscores."
+					done = true
+				} else {
+					return err
+				}
+			} else {
+				if created {
+					text = "Great! Your gif pack has been created."
+					done = true
+				} else {
+					text = "Oh no! That pack name has already been taken."
+					done = true
+				}
+			}
+		} else {
+			text = "Oops! I was waiting for you to send me a name for your new gif pack."
+		}
+
+		reply := tgbotapi.NewMessage(chatId, text)
+		if !message.Chat.IsPrivate() {
+			reply.ReplyToMessageID = message.MessageID
+
+			if !done {
+				reply.ReplyMarkup = tgbotapi.ForceReply{
+					ForceReply: true,
+					Selective:  true,
+				}
 			}
 		}
 
-		return nil
+		_, err := bot.Send(reply)
+		if err != nil {
+			return err
+		}
+	case state["action"] == "subscribe": // subscribe waiting for pack name
+		var text string
+		if packName := message.Text; packName != "" {
+			subscribed, err := Subscribe(ctx, packName, userId)
+			if err != nil {
+				if err == ErrNotFound {
+					text = "Oops! There doesn't seem to be any gif pack with that name."
+					done = true
+				} else {
+					return err
+				}
+			} else {
+				if subscribed {
+					text = "Great! You have been subscribed to this gif pack!"
+					done = true
+				} else {
+					text = "Don't worry, you are already subscribed to this gif pack!"
+					done = true
+				}
+			}
+		} else {
+			text = "Oops, I was waiting for you to send me the name of the gif pack you want to subcribe to."
+		}
+
+		reply := tgbotapi.NewMessage(chatId, text)
+		if !message.Chat.IsPrivate() {
+			reply.ReplyToMessageID = message.MessageID
+
+			if !done {
+				reply.ReplyMarkup = tgbotapi.ForceReply{
+					ForceReply: true,
+					Selective:  true,
+				}
+			}
+		}
+
+		_, err := bot.Send(reply)
+		if err != nil {
+			return err
+		}
+	case state["action"] == "unsubscribe": // unsubscribe waiting for pack name
+		var text string
+		if packName := message.Text; packName != "" {
+			unsubscribed, err := Unsubscribe(ctx, packName, userId)
+			if err != nil {
+				if err == ErrInvalidName {
+					text = "Oh no! That was not a valid pack name. Pack names can only contain letter, numbers, hyphens and underscores."
+					done = true
+				} else {
+					return err
+				}
+			} else {
+				if unsubscribed {
+					text = "Great! You have been unsubscribed from that gif pack."
+					done = true
+				} else {
+					text = "Don't worry, it seems like you were never subscribed to that gif pack in the first place."
+					done = true
+				}
+			}
+		} else {
+			text = "Oops, I was waiting for you to send me the name of the gif pack you want to unsubscribe from."
+		}
+
+		reply := tgbotapi.NewMessage(chatId, text)
+		if !message.Chat.IsPrivate() {
+			reply.ReplyToMessageID = message.MessageID
+
+			if !done {
+				reply.ReplyMarkup = tgbotapi.ForceReply{
+					ForceReply: true,
+					Selective:  true,
+				}
+			}
+		}
+
+		_, err := bot.Send(reply)
+		if err != nil {
+			return err
+		}
+	}
+
+	if done {
+		// reset state since we are done
+		state = nil
+		err = SetConversationState(ctx, chatId, userId, state)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
