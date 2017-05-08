@@ -243,30 +243,102 @@ func NewGif(ctx context.Context, pack string, user int, gif Gif) error {
 	return nil
 }
 
+// query is a string with the format
+//   <query> ::= <pack-name> <keywords>*
+//   <pack-name> ::= <word> | "-"
+//   <keywords> ::= <word>*
+// If pack-name != "-", SearchGifs will limit results to gifs from pack-name, otherwise SearchGifs will search in all
+// packs that user is subscribed to.
+//
+// If there is no pack called pack-name, SearchGifs will return no results.
+// If <keywords> is provided, SearchGifs will filter the gifs it returns to only those containing <keywords>.
 func SearchGifs(ctx context.Context, user int, query string) ([]Gif, error) {
-	// get all packs user is subscribed to
-	q := datastore.NewQuery(subscriptionKind).Filter("User =", user)
-
-	var subscriptions []Subscription
-	_, err := q.GetAll(ctx, &subscriptions)
-	if err != nil {
-		return nil, err
-	}
-
-	// if the user is not subscribed to any packs, return an empty slice and no error
-	if len(subscriptions) == 0 {
+	// no results for an empty query
+	if query == "" {
 		return nil, nil
 	}
 
-	// search for gifs
-	gIndex, err := search.Open(gifsIndex)
-	if err != nil {
-		return nil, err
+	split := collapseWhitespaceRegex.Split(query, -1)
+	packName := split[0]
+	var keywords []string
+	if len(split) > 1 {
+		keywords = split[1:]
 	}
 
 	var results []Gif
-	for _, s := range subscriptions {
-		q := fmt.Sprintf("Pack = %s AND Keywords = (%s)", s.Pack, strings.Join(collapseWhitespaceRegex.Split(query, -1), " OR "))
+	if packName == "-" {
+		// get all packs user is subscribed to
+		q := datastore.NewQuery(subscriptionKind).Filter("User =", user)
+
+		var subscriptions []Subscription
+		_, err := q.GetAll(ctx, &subscriptions)
+		if err != nil {
+			return nil, err
+		}
+
+		// if the user is not subscribed to any packs, return an empty slice and no error
+		if len(subscriptions) == 0 {
+			return nil, nil
+		}
+
+		// search for gifs
+		gIndex, err := search.Open(gifsIndex)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, s := range subscriptions {
+			var q string
+			if len(keywords) > 0 {
+				q = fmt.Sprintf("Pack = %s AND Keywords = (%s)", s.Pack, strings.Join(keywords, " OR "))
+			} else {
+				q = fmt.Sprintf("Pack = %s", s.Pack)
+			}
+
+			for t := gIndex.Search(ctx, q, nil); ; {
+				var gif Gif
+				_, err := t.Next(&gif)
+				if err != nil {
+					if err == search.Done {
+						break
+					} else {
+						return nil, err
+					}
+				}
+
+				results = append(results, gif)
+			}
+		}
+	} else {
+		// return nil if packName is invalid
+		if !packNameRegex.MatchString(packName) {
+			return nil, nil
+		}
+
+		var pack Pack
+		key := datastore.NewKey(ctx, packKind, packName, 0, nil)
+		err := datastore.Get(ctx, key, &pack)
+		if err != nil {
+			if err == datastore.ErrNoSuchEntity {
+				return nil, nil
+			} else {
+				return nil, err
+			}
+		}
+
+		// search for gifs
+		gIndex, err := search.Open(gifsIndex)
+		if err != nil {
+			return nil, err
+		}
+
+		var q string
+		if len(keywords) > 0 {
+			q = fmt.Sprintf("Pack = %s AND Keywords = (%s)", packName, strings.Join(keywords, " OR "))
+		} else {
+			q = fmt.Sprintf("Pack = %s", packName)
+		}
+
 		for t := gIndex.Search(ctx, q, nil); ; {
 			var gif Gif
 			_, err := t.Next(&gif)
