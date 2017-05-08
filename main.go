@@ -69,9 +69,18 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 		// handle a new command
 		if command := message.Command(); command != "" {
 			if handler, exists := commandHandlers[command]; exists {
-				err := handler(ctx, &bot, message)
+				// clear bot state before a new command
+				state := make(map[string]string)
+				err := SetConversationState(ctx, message.Chat.ID, message.From.ID, state)
 				if err != nil {
 					SomethingWentWrong(ctx, &bot, message, err)
+					return
+				}
+
+				err = handler(ctx, &bot, message)
+				if err != nil {
+					SomethingWentWrong(ctx, &bot, message, err)
+					return
 				}
 			}
 		} else {
@@ -79,6 +88,7 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 			err := Transduce(ctx, &bot, message)
 			if err != nil {
 				SomethingWentWrong(ctx, &bot, message, err)
+				return
 			}
 		}
 
