@@ -86,23 +86,8 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if inlineQuery := update.InlineQuery; inlineQuery != nil {
-		id := inlineQuery.ID
-
-		config := tgbotapi.InlineConfig{
-			InlineQueryID: id,
-			Results: []interface{}{
-				NewInlineQueryResultCachedMpeg4Gif("CgADBQADAgAD_AfhV7d7t0mZPmy8Ag", "CgADBQADAgAD_AfhV7d7t0mZPmy8Ag"),
-				NewInlineQueryResultCachedMpeg4Gif("CgADBQADLgADn0JAV_DttqWfPpaKAg", "CgADBQADLgADn0JAV_DttqWfPpaKAg"),
-				NewInlineQueryResultCachedMpeg4Gif("CgADBQADAQADyXiIVajLNBrhWeT8Ag", "CgADBQADAQADyXiIVajLNBrhWeT8Ag"),
-				NewInlineQueryResultCachedMpeg4Gif("CgADBAADhEAAAlsdZAfSEgVmHiiiFAI", "CgADBAADhEAAAlsdZAfSEgVmHiiiFAI"),
-			},
-		}
-
-		resp, err := bot.AnswerInlineQuery(config)
-		if err != nil {
-			log.Errorf(ctx, "%v", resp)
-			log.Errorf(ctx, "%v", err)
-		}
+		HandleInlineQuery(ctx, &bot, inlineQuery)
+		return
 	}
 }
 

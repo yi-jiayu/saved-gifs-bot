@@ -49,8 +49,8 @@ var commandHandlers = map[string]MessageHandler{
 			if len(packs) > 0 {
 				text = "Here are the gif packs you have created: \n"
 
-				for i, list := range packs {
-					text += fmt.Sprintf("%d. %s\n", i+1, list.Name)
+				for i, pack := range packs {
+					text += fmt.Sprintf("%d. %s\n", i+1, pack.Name)
 				}
 			} else {
 				text = "Oops! It looks like you haven't created any gif packs yet."
@@ -133,13 +133,13 @@ var commandHandlers = map[string]MessageHandler{
 			return err
 		} else {
 			if len(subscriptions) > 0 {
-				text = "Here are the lists you are currently subscribed to: \n"
+				text = "Here are the packs you are currently subscribed to: \n"
 
 				for i, subscription := range subscriptions {
 					text += fmt.Sprintf("%d. %s\n", i+1, subscription.Pack)
 				}
 			} else {
-				text = "Oops! It looks like you haven't subscribed to any lists yet."
+				text = "Oops! It looks like you haven't subscribed to any packs yet."
 			}
 		}
 
@@ -179,13 +179,6 @@ var commandHandlers = map[string]MessageHandler{
 					} else {
 						text := "Please send me the gif you want to add to this pack."
 						reply = tgbotapi.NewMessage(chatId, text)
-						reply.ReplyToMessageID = message.MessageID
-						if !message.Chat.IsPrivate() {
-							reply.ReplyMarkup = tgbotapi.ForceReply{
-								ForceReply: true,
-								Selective:  true,
-							}
-						}
 					}
 				} else {
 					text := "Oops, it seems like you are not the creator of this pack. Only the pack creator can add gifs to a pack."
@@ -203,13 +196,14 @@ var commandHandlers = map[string]MessageHandler{
 			} else {
 				text := "Which pack do you want to add a new gif to?"
 				reply = tgbotapi.NewMessage(chatId, text)
-				reply.ReplyToMessageID = message.MessageID
-				if !message.Chat.IsPrivate() {
-					reply.ReplyMarkup = tgbotapi.ForceReply{
-						ForceReply: true,
-						Selective:  true,
-					}
-				}
+			}
+		}
+
+		if !message.Chat.IsPrivate() {
+			reply.ReplyToMessageID = message.MessageID
+			reply.ReplyMarkup = tgbotapi.ForceReply{
+				ForceReply: true,
+				Selective:  true,
 			}
 		}
 
