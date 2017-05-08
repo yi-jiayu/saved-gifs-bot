@@ -11,6 +11,10 @@ func HandleInlineQuery(ctx context.Context, bot *tgbotapi.BotAPI, inlineQuery *t
 	userId := inlineQuery.From.ID
 	query := inlineQuery.Query
 
+	if query == "" {
+		return
+	}
+
 	gifs, err := SearchGifs(ctx, userId, query)
 	if err != nil {
 		log.Errorf(ctx, "%v", err)
@@ -20,9 +24,15 @@ func HandleInlineQuery(ctx context.Context, bot *tgbotapi.BotAPI, inlineQuery *t
 		return
 	}
 
-	var results []interface{}
+	// deduplicate results
+	gifsMap := make(map[string]int)
 	for _, gif := range gifs {
-		id := string(gif.FileID)
+		gifsMap[string(gif.FileID)] = 0
+	}
+
+	var results []interface{}
+	for fileId := range gifsMap {
+		id := string(fileId)
 		results = append(results, NewInlineQueryResultCachedMpeg4Gif(id, id))
 	}
 
