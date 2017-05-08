@@ -1,10 +1,10 @@
 package saved_gifs_bot
 
 import (
+	"reflect"
 	"testing"
 
 	"google.golang.org/appengine/aetest"
-	"reflect"
 )
 
 func TestGetSetConversationState(t *testing.T) {

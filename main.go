@@ -11,7 +11,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
-	"google.golang.org/appengine/search"
 	"google.golang.org/appengine/urlfetch"
 )
 
@@ -67,6 +66,7 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if message := update.Message; message != nil {
+		// handle a new command
 		if command := message.Command(); command != "" {
 			if handler, exists := commandHandlers[command]; exists {
 				err := handler(ctx, &bot, message)
@@ -74,54 +74,18 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 					SomethingWentWrong(ctx, &bot, message, err)
 				}
 			}
-		} else if document := message.Document; document != nil {
-			if handler, exists := documentHandlers[document.MimeType]; exists {
-				err := handler(ctx, &bot, message)
-				if err != nil {
-					SomethingWentWrong(ctx, &bot, message, err)
-				}
-			}
-		} else if message.Text != "" {
-			var textHandler MessageHandler = func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
-				chatId := message.Chat.ID
-				userId := message.From.ID
-				text := message.Text
-
-				state, err := GetConversationState(ctx, chatId, userId)
-				if err != nil {
-					return err
-				}
-
-				// continuation of newgif
-				if state["action"] == "newgif" && state["pack"] != "" && state["fileId"] != "" {
-					pack := state["pack"]
-					gif := Gif{
-						FileID:   search.Atom(state["fileId"]),
-						Keywords: text,
-					}
-
-					err := NewGif(ctx, pack, userId, gif)
-					if err != nil {
-						return err
-					}
-
-					text := "Great! A new gif has been added to your gif pack."
-					reply := tgbotapi.NewMessage(chatId, text)
-					_, err = bot.Send(reply)
-					if err != nil {
-						return err
-					}
-				}
-
-				return nil
-			}
-
-			err := textHandler(ctx, &bot, message)
+		} else {
+			// or continue based on the previous conversation state
+			err := Transduce(ctx, &bot, message)
 			if err != nil {
-				log.Errorf(ctx, "%v", err)
+				SomethingWentWrong(ctx, &bot, message, err)
 			}
 		}
-	} else if inlineQuery := update.InlineQuery; inlineQuery != nil {
+
+		return
+	}
+
+	if inlineQuery := update.InlineQuery; inlineQuery != nil {
 		id := inlineQuery.ID
 
 		config := tgbotapi.InlineConfig{
