@@ -359,6 +359,16 @@ var commandHandlers = map[string]MessageHandler{
 
 		return nil
 	},
+	"version": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
+		chatId := message.Chat.ID
+		reply := tgbotapi.NewMessage(chatId, fmt.Sprintf("Saved GIFs Bot version %s", Version))
+		_, err := bot.Send(reply)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	},
 }
 
 type MessageHandler func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error
