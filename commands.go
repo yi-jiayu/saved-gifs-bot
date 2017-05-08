@@ -301,6 +301,64 @@ var commandHandlers = map[string]MessageHandler{
 
 		return nil
 	},
+	"deletegif": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
+		chatId := message.Chat.ID
+		userId := message.From.ID
+
+		var state map[string]string
+		var text string
+		done := false
+		if packName := message.CommandArguments(); packName != "" {
+			_, err := GetPack(ctx, packName)
+			if err != nil {
+				if err == ErrNotFound {
+					text = "Oops! There doesn't seem to be any gif pack with that name."
+					done = true
+				} else {
+					return err
+				}
+			} else {
+				state = map[string]string{
+					"action": "deletegif",
+					"pack":   packName,
+				}
+
+				text = "Please send me the gif you want to delete from this pack."
+			}
+		} else {
+			state = map[string]string{
+				"action": "deletegif",
+			}
+
+			text = "Which gif pack do you want to delete a gif from?"
+		}
+
+		if !done {
+			err := SetConversationState(ctx, chatId, userId, state)
+			if err != nil {
+				return err
+			}
+		}
+
+		reply := tgbotapi.NewMessage(chatId, text)
+
+		if !message.Chat.IsPrivate() {
+			reply.ReplyToMessageID = message.MessageID
+			if !done {
+				reply.ReplyMarkup = tgbotapi.ForceReply{
+					ForceReply: true,
+					Selective:  true,
+				}
+			}
+		}
+
+		_, err := bot.Send(reply)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	},
 }
 
 type MessageHandler func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error

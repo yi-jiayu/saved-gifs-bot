@@ -209,6 +209,8 @@ func MySubscriptions(ctx context.Context, user int) ([]Subscription, error) {
 }
 
 func NewGif(ctx context.Context, pack string, user int, gif Gif) error {
+	// todo: return additional information about whether a gif is already in a pack
+
 	// validate pack name
 	if !packNameRegex.MatchString(pack) {
 		return ErrInvalidName
@@ -241,6 +243,58 @@ func NewGif(ctx context.Context, pack string, user int, gif Gif) error {
 	}
 
 	return nil
+}
+
+func DeleteGif(ctx context.Context, pack string, user int, fileId string) (int, error) {
+	// validate pack name
+	if !packNameRegex.MatchString(pack) {
+		return 0, ErrInvalidName
+	}
+
+	// check that user is the creator of pack
+	var p Pack
+	key := datastore.NewKey(ctx, packKind, pack, 0, nil)
+	err := datastore.Get(ctx, key, &p)
+	if err != nil {
+		if err == datastore.ErrNoSuchEntity {
+			return 0, ErrNotFound
+		} else {
+			return 0, err
+		}
+	}
+
+	if user != p.Creator {
+		return 0, ErrNotAllowed
+	}
+
+	// get all instances of this gif in the pack
+	index, err := search.Open(gifsIndex)
+	if err != nil {
+		return 0, err
+	}
+
+	deleted := 0
+	q := fmt.Sprintf("Pack = %s AND FileID = %s", pack, fileId)
+	for t := index.Search(ctx, q, nil); ; {
+		var gif Gif
+		id, err := t.Next(&gif)
+		if err != nil {
+			if err == search.Done {
+				break
+			} else {
+				return deleted, err
+			}
+		}
+
+		// try to delete all gifs which have the same fileid
+		err = index.Delete(ctx, id)
+		if err != nil {
+			return deleted, err
+		}
+		deleted++
+	}
+
+	return deleted, nil
 }
 
 // query is a string with the format

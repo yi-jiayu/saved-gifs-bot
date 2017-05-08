@@ -257,6 +257,88 @@ var Transduce MessageHandler = func(ctx context.Context, bot *tgbotapi.BotAPI, m
 		if err != nil {
 			return err
 		}
+	case state["action"] == "deletegif" && state["pack"] == "": // deletegif waiting for pack name
+		var text string
+		if packName := message.Text; packName != "" {
+			_, err := GetPack(ctx, packName)
+			if err != nil {
+				if err == ErrNotFound {
+					text = "Oops! There doesn't seem to be any gif pack with that name."
+					done = true
+				} else {
+					return err
+				}
+			} else {
+				state["pack"] = packName
+				err := SetConversationState(ctx, chatId, userId, state)
+				if err != nil {
+					return err
+				}
+
+				text = "Please send me the gif you want to delete from this pack."
+			}
+		} else {
+			text = "Oops, I was waiting for you to send me the name of the gif pack you want to delete a gif from."
+		}
+
+		reply := tgbotapi.NewMessage(chatId, text)
+		if !message.Chat.IsPrivate() {
+			reply.ReplyToMessageID = message.MessageID
+
+			if !done {
+				reply.ReplyMarkup = tgbotapi.ForceReply{
+					ForceReply: true,
+					Selective:  true,
+				}
+			}
+		}
+
+		_, err := bot.Send(reply)
+		if err != nil {
+			return err
+		}
+	case state["action"] == "deletegif" && state["pack"] != "": // deletegif waiting for gif
+		var text string
+		if document := message.Document; document.MimeType == "video/mp4" {
+			fileId := document.FileID
+
+			deleted, err := DeleteGif(ctx, state["pack"], message.From.ID, fileId)
+			if err != nil {
+				if err == ErrNotFound {
+					text = "Oops, there doesn't seem to be any gif pack with that name."
+					done = true
+				} else {
+					return err
+				}
+			} else {
+				if deleted > 0 {
+					text = "Great, that gif has been deleted!"
+					done = true
+				} else {
+					text = "Oops, I couldn't find that gif in this pack."
+					done = true
+				}
+			}
+		} else {
+			text = "Oops, I was waiting for you to send me a gif to be deleted from this pack."
+		}
+
+		reply := tgbotapi.NewMessage(chatId, text)
+		if !message.Chat.IsPrivate() {
+			reply.ReplyToMessageID = message.MessageID
+
+			if !done {
+				reply.ReplyMarkup = tgbotapi.ForceReply{
+					ForceReply: true,
+					Selective:  true,
+				}
+			}
+		}
+
+		_, err := bot.Send(reply)
+		if err != nil {
+			return err
+		}
 	}
 
 	if done {
