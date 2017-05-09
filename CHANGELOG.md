@@ -1,5 +1,9 @@
 # Change Log
 
+## v0.1.2
+### Changed
+- Empty inline queries will default to returning gifs from all of a user's subscribed packs.
+
 ## v0.1.1 - 2017-05-09
 ### Added
 - Initial support for adding contributors to gif packs. Contributors will be able to help add, remove and edit gifs 

@@ -12,10 +12,6 @@ func HandleInlineQuery(ctx context.Context, bot *tgbotapi.BotAPI, inlineQuery *t
 	userID := inlineQuery.From.ID
 	query := inlineQuery.Query
 
-	if query == "" {
-		return
-	}
-
 	gifs, err := SearchGifs(ctx, userID, query)
 	if err != nil {
 		log.Errorf(ctx, "%v", err)

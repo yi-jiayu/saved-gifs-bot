@@ -428,9 +428,9 @@ func DeleteGif(ctx context.Context, pack string, user int, fileID string) (int, 
 // If there is no pack called pack-name, SearchGifs will return no results.
 // If <keywords> is provided, SearchGifs will filter the gifs it returns to only those containing <keywords>.
 func SearchGifs(ctx context.Context, user int, query string) ([]Gif, error) {
-	// no results for an empty query
+	// default to searching all subscribed packs
 	if query == "" {
-		return nil, nil
+		query = "-"
 	}
 
 	split := collapseWhitespaceRegex.Split(query, -1)
