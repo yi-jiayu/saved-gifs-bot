@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
 	"google.golang.org/appengine/datastore"
 )
@@ -23,6 +25,22 @@ func sliceSameContents(s1, s2 []int) bool {
 	}
 
 	return reflect.DeepEqual(m1, m2)
+}
+
+func NewContext(opts *aetest.Options) (context.Context, func(), error) {
+	inst, err := aetest.NewInstance(opts)
+	if err != nil {
+		return nil, nil, err
+	}
+	req, err := inst.NewRequest("GET", "/", nil)
+	if err != nil {
+		inst.Close()
+		return nil, nil, err
+	}
+	ctx := appengine.NewContext(req)
+	return ctx, func() {
+		inst.Close()
+	}, nil
 }
 
 func TestNewPack(t *testing.T) {
@@ -229,7 +247,9 @@ func TestDeleteContributor(t *testing.T) {
 }
 
 func TestSubscribe(t *testing.T) {
-	ctx, done, err := aetest.NewContext()
+	ctx, done, err := NewContext(&aetest.Options{
+		StronglyConsistentDatastore: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
