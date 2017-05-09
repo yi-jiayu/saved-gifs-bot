@@ -85,7 +85,7 @@ func cmdMyPacksHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbot
 	chatID := message.Chat.ID
 
 	var text string
-	userPacks, err := MyPacks(ctx, userID)
+	userPacks, err := GetUserPacks(ctx, userID)
 	if err != nil {
 		return err
 	}

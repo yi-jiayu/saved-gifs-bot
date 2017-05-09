@@ -92,8 +92,8 @@ func NewPack(ctx context.Context, name string, creator int) (bool, error) {
 	return true, nil
 }
 
-// MyPacks returns a UserPacks struct representing the packs a user has created and is a contributor to
-func MyPacks(ctx context.Context, userID int) (UserPacks, error) {
+// GetUserPacks returns a UserPacks struct representing the packs a user has created and is a contributor to
+func GetUserPacks(ctx context.Context, userID int) (UserPacks, error) {
 	var isCreator []Pack
 	q1 := datastore.NewQuery(packKind).Filter("Creator =", userID)
 	_, err := q1.GetAll(ctx, &isCreator)
@@ -116,7 +116,7 @@ func MyPacks(ctx context.Context, userID int) (UserPacks, error) {
 	return userPacks, nil
 }
 
-// GetPack retrieves information about a specific gif pack
+// GetPack retrieves information about a specific gif pack by the pack name
 func GetPack(ctx context.Context, name string) (Pack, error) {
 	// validate pack name
 	if !packNameRegex.MatchString(name) {
@@ -137,8 +137,8 @@ func GetPack(ctx context.Context, name string) (Pack, error) {
 	return pack, nil
 }
 
-// UpdatePack is a convenience wrapper around datastore.Put to update the value of pack in the datastore
-func UpdatePack(ctx context.Context, pack *Pack) error {
+// SetPack is a convenience wrapper around datastore.Put to update the value of pack in the datastore
+func SetPack(ctx context.Context, pack *Pack) error {
 	// validate pack name
 	if !packNameRegex.MatchString(pack.Name) {
 		return ErrInvalidName
@@ -153,8 +153,8 @@ func UpdatePack(ctx context.Context, pack *Pack) error {
 	return nil
 }
 
-// AddContributor adds a contributor to a gif pack
-func AddContributor(ctx context.Context, packName string, creator, contributor int) (bool, error) {
+// NewContributor adds a contributor to a gif pack
+func NewContributor(ctx context.Context, packName string, creator, contributor int) (bool, error) {
 	// validate pack name
 	if !packNameRegex.MatchString(packName) {
 		return false, ErrInvalidName
@@ -179,7 +179,7 @@ func AddContributor(ctx context.Context, packName string, creator, contributor i
 
 	// update pack
 	pack.Contributors = append(pack.Contributors, contributor)
-	err = UpdatePack(ctx, &pack)
+	err = SetPack(ctx, &pack)
 	if err != nil {
 		return false, err
 	}
@@ -187,8 +187,8 @@ func AddContributor(ctx context.Context, packName string, creator, contributor i
 	return true, nil
 }
 
-// RemoveContributor removes a contributor from a gif pack
-func RemoveContributor(ctx context.Context, packName string, creator, contributor int) (bool, error) {
+// DeleteContributor removes a contributor from a gif pack
+func DeleteContributor(ctx context.Context, packName string, creator, contributor int) (bool, error) {
 	// validate pack name
 	if !packNameRegex.MatchString(packName) {
 		return false, ErrInvalidName
@@ -225,7 +225,7 @@ func RemoveContributor(ctx context.Context, packName string, creator, contributo
 
 	// update pack
 	pack.Contributors = a[:len(a)-1]
-	err = UpdatePack(ctx, &pack)
+	err = SetPack(ctx, &pack)
 	if err != nil {
 		return false, err
 	}
@@ -235,7 +235,7 @@ func RemoveContributor(ctx context.Context, packName string, creator, contributo
 
 // Subscribe returns true if user was successfully subscribed to pack, false if user was already subscribed to pack.
 // err will be ErrNotFound if pack does not exist.
-func Subscribe(ctx context.Context, pack string, user int) (bool, error) {
+func Subscribe(ctx context.Context, pack string, userID int) (bool, error) {
 	// validate pack name
 	if !packNameRegex.MatchString(pack) {
 		return false, ErrInvalidName
@@ -253,21 +253,20 @@ func Subscribe(ctx context.Context, pack string, user int) (bool, error) {
 		return false, err
 	}
 
-	// check if user is already subscribed
-	q := datastore.NewQuery(subscriptionKind).Filter("UserID =", user).Filter("Pack =", pack)
+	// check if userID is already subscribed
+	q := datastore.NewQuery(subscriptionKind).Filter("UserID =", userID).Filter("Pack =", pack).KeysOnly().Limit(1)
 
-	var subscriptions []Subscription
-	_, err = q.GetAll(ctx, &subscriptions)
+	keys, err := q.GetAll(ctx, nil)
 	if err != nil {
 		return false, err
 	}
 
-	if len(subscriptions) > 0 {
+	if len(keys) > 0 {
 		return false, nil
 	}
 
 	subscription := Subscription{
-		UserID: user,
+		UserID: userID,
 		Pack:   pack,
 	}
 

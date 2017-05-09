@@ -1,3 +1,5 @@
+// +build go1.7
+
 package main
 
 import (
@@ -23,7 +25,66 @@ func sliceSameContents(s1, s2 []int) bool {
 	return reflect.DeepEqual(m1, m2)
 }
 
-func TestAddContributor(t *testing.T) {
+func TestNewPack(t *testing.T) {
+	ctx, done, err := aetest.NewContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer done()
+
+	pack1 := Pack{
+		Name:    "pack1",
+		Creator: 1,
+	}
+
+	key := datastore.NewKey(ctx, packKind, pack1.Name, 0, nil)
+	_, err = datastore.Put(ctx, key, &pack1)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	t.Run("name taken", func(t *testing.T) {
+		ok, err := NewPack(ctx, pack1.Name, 2)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+
+		if ok {
+			t.Fail()
+		}
+
+		// check that pack1 is untouched
+		pack, err := GetPack(ctx, pack1.Name)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+
+		if !reflect.DeepEqual(pack, pack1) {
+			t.Fail()
+		}
+	})
+	t.Run("ok", func(t *testing.T) {
+		ok, err := NewPack(ctx, "pack2", 2)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+
+		if !ok {
+			t.Fail()
+		}
+
+		pack2, err := GetPack(ctx, "pack2")
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+
+		if pack2.Name != "pack2" || pack2.Creator != 2 || len(pack2.Contributors) != 0 {
+			t.Fail()
+		}
+	})
+}
+
+func TestNewContributor(t *testing.T) {
 	ctx, done, err := aetest.NewContext()
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +104,7 @@ func TestAddContributor(t *testing.T) {
 	}
 
 	t.Run("not creator", func(t *testing.T) {
-		_, err := AddContributor(ctx, "pack1", 2, 3)
+		_, err := NewContributor(ctx, "pack1", 2, 3)
 		if err != nil {
 			if err != ErrNotAllowed {
 				t.Fatalf("%v", err)
@@ -55,7 +116,7 @@ func TestAddContributor(t *testing.T) {
 		t.Fail()
 	})
 	t.Run("already a contributor", func(t *testing.T) {
-		ok, err := AddContributor(ctx, "pack1", 1, 2)
+		ok, err := NewContributor(ctx, "pack1", 1, 2)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -74,7 +135,7 @@ func TestAddContributor(t *testing.T) {
 		}
 	})
 	t.Run("ok", func(t *testing.T) {
-		ok, err := AddContributor(ctx, "pack1", 1, 3)
+		ok, err := NewContributor(ctx, "pack1", 1, 3)
 		if err != nil {
 			t.Fatalf("%v", err)
 			return
@@ -95,7 +156,7 @@ func TestAddContributor(t *testing.T) {
 	})
 }
 
-func TestRemoveContributor(t *testing.T) {
+func TestDeleteContributor(t *testing.T) {
 	ctx, done, err := aetest.NewContext()
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +176,7 @@ func TestRemoveContributor(t *testing.T) {
 	}
 
 	t.Run("not creator", func(t *testing.T) {
-		_, err := RemoveContributor(ctx, "pack1", 3, 2)
+		_, err := DeleteContributor(ctx, "pack1", 3, 2)
 		if err != nil {
 			if err != ErrNotAllowed {
 				t.Fatalf("%v", err)
@@ -127,7 +188,7 @@ func TestRemoveContributor(t *testing.T) {
 		t.Fail()
 	})
 	t.Run("not a contributor", func(t *testing.T) {
-		ok, err := RemoveContributor(ctx, "pack1", 1, 3)
+		ok, err := DeleteContributor(ctx, "pack1", 1, 3)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -146,7 +207,7 @@ func TestRemoveContributor(t *testing.T) {
 		}
 	})
 	t.Run("ok", func(t *testing.T) {
-		ok, err := RemoveContributor(ctx, "pack1", 1, 2)
+		ok, err := DeleteContributor(ctx, "pack1", 1, 2)
 		if err != nil {
 			t.Fatalf("%v", err)
 			return
@@ -162,6 +223,69 @@ func TestRemoveContributor(t *testing.T) {
 		}
 
 		if !sliceSameContents([]int{}, pack.Contributors) {
+			t.Fail()
+		}
+	})
+}
+
+func TestSubscribe(t *testing.T) {
+	ctx, done, err := aetest.NewContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer done()
+
+	pack1 := Pack{
+		Name:    "pack1",
+		Creator: 1,
+	}
+
+	subscription1 := Subscription{
+		UserID: 1,
+		Pack:   "pack1",
+	}
+
+	key1 := datastore.NewKey(ctx, packKind, pack1.Name, 0, nil)
+	key2 := datastore.NewIncompleteKey(ctx, subscriptionKind, nil)
+
+	_, err1 := datastore.Put(ctx, key1, &pack1)
+	if err1 != nil {
+		t.Fatalf("%v", err1)
+	}
+	_, err2 := datastore.Put(ctx, key2, &subscription1)
+	if err2 != nil {
+		t.Fatalf("%v", err2)
+	}
+
+	t.Run("nonexistent pack", func(t *testing.T) {
+		_, err := Subscribe(ctx, "pack2", 1)
+		if err != nil {
+			if err != ErrNotFound {
+				t.Fatalf("%v", err)
+			}
+
+			return
+		}
+
+		t.Fail()
+	})
+	t.Run("already subscribed", func(t *testing.T) {
+		ok, err := Subscribe(ctx, pack1.Name, subscription1.UserID)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+
+		if ok {
+			t.Fail()
+		}
+	})
+	t.Run("ok", func(t *testing.T) {
+		ok, err := Subscribe(ctx, pack1.Name, 2)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+
+		if !ok {
 			t.Fail()
 		}
 	})
