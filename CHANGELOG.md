@@ -1,5 +1,13 @@
 # Change Log
 
+## v0.1.3
+### Changed
+- `/newgif` will no longer add duplicate gifs to a pack.
+- `/newgif` will report if a gif is already in a pack after sending a gif.
+
+### Added
+- Initial support for editing gif keywords. The `/editgif` command will be added in a later update.
+
 ## v0.1.2
 ### Changed
 - Empty inline queries will default to returning gifs from all of a user's subscribed packs.

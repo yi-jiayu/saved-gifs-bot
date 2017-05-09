@@ -7,7 +7,7 @@ import (
 )
 
 // Transduce continues a conversation based on an incoming message and the current conversation state.
-var Transduce MessageHandler = func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
+func Transduce(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
 	chatID := message.Chat.ID
 	userID := message.From.ID
 
@@ -72,16 +72,27 @@ var Transduce MessageHandler = func(ctx context.Context, bot *tgbotapi.BotAPI, m
 		}
 	case state["action"] == "newgif" && state["pack"] != "" && state["fileID"] == "": // newgif waiting for gif
 		var reply tgbotapi.MessageConfig
-		if document := message.Document; document != nil {
-			state["fileID"] = document.FileID
-
-			err = SetConversationState(ctx, chatID, userID, state)
+		if document := message.Document; document.MimeType == "video/mp4" {
+			_, err := GetGif(ctx, state["pack"], document.FileID)
 			if err != nil {
-				return err
-			}
+				if err == ErrNotFound {
+					state["fileID"] = document.FileID
 
-			text := "Alright, now send me some keywords that describe this gif."
-			reply = tgbotapi.NewMessage(chatID, text)
+					err = SetConversationState(ctx, chatID, userID, state)
+					if err != nil {
+						return err
+					}
+
+					text := "Alright, now send me some keywords that describe this gif."
+					reply = tgbotapi.NewMessage(chatID, text)
+				} else {
+					return err
+				}
+			} else {
+				text := "Oops, that gif is already part of this pack. Perhaps you wanted to edit its keywords instead?"
+				reply = tgbotapi.NewMessage(chatID, text)
+				done = true
+			}
 		} else {
 			text := "Oops, I was waiting for you to send me a gif."
 			reply = tgbotapi.NewMessage(chatID, text)
@@ -109,12 +120,17 @@ var Transduce MessageHandler = func(ctx context.Context, bot *tgbotapi.BotAPI, m
 				Keywords: text,
 			}
 
-			err := NewGif(ctx, pack, userID, gif)
+			ok, err := NewGif(ctx, pack, userID, gif)
 			if err != nil {
 				return err
 			}
 
-			t := "Great! A new gif has been added to your gif pack."
+			var t string
+			if ok {
+				t = "Great! A new gif has been added to your gif pack."
+			} else {
+				t = "Oops, that gif is already part of this pack. Perhaps you wanted to edit its keywords instead?"
+			}
 			reply = tgbotapi.NewMessage(chatID, t)
 			done = true
 		} else {
@@ -304,22 +320,21 @@ var Transduce MessageHandler = func(ctx context.Context, bot *tgbotapi.BotAPI, m
 		if document := message.Document; document.MimeType == "video/mp4" {
 			fileID := document.FileID
 
-			deleted, err := DeleteGif(ctx, state["pack"], message.From.ID, fileID)
+			ok, err := DeleteGif(ctx, state["pack"], message.From.ID, fileID)
 			if err != nil {
 				if err == ErrNotFound {
 					text = "Oops, there doesn't seem to be any gif pack with that name."
 					done = true
-				} else {
-					return err
 				}
+
+				return err
 			} else {
-				if deleted > 0 {
+				if ok {
 					text = "Great, that gif has been deleted!"
-					done = true
 				} else {
 					text = "Oops, I couldn't find that gif in this pack."
-					done = true
 				}
+				done = true
 			}
 		} else {
 			text = "Oops, I was waiting for you to send me a gif to be deleted from this pack."

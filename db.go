@@ -242,19 +242,13 @@ func Subscribe(ctx context.Context, pack string, userID int) (bool, error) {
 	}
 
 	// check if pack exists
-	var p Pack
-	key := datastore.NewKey(ctx, packKind, pack, 0, nil)
-	err := datastore.Get(ctx, key, &p)
+	_, err := GetPack(ctx, pack)
 	if err != nil {
-		if err == datastore.ErrNoSuchEntity {
-			return false, ErrNotFound
-		}
-
 		return false, err
 	}
 
 	// check if userID is already subscribed
-	q := datastore.NewQuery(subscriptionKind).Filter("UserID =", userID).Filter("Pack =", pack).KeysOnly().Limit(1)
+	q := datastore.NewQuery(subscriptionKind).Filter("UserID =", userID).Filter("Pack =", pack).Limit(1).KeysOnly()
 
 	keys, err := q.GetAll(ctx, nil)
 	if err != nil {
@@ -270,7 +264,7 @@ func Subscribe(ctx context.Context, pack string, userID int) (bool, error) {
 		Pack:   pack,
 	}
 
-	key = datastore.NewIncompleteKey(ctx, subscriptionKind, nil)
+	key := datastore.NewIncompleteKey(ctx, subscriptionKind, nil)
 	_, err = datastore.Put(ctx, key, &subscription)
 	if err != nil {
 		return false, err
@@ -288,11 +282,10 @@ func Unsubscribe(ctx context.Context, pack string, user int) (bool, error) {
 	}
 
 	// check if user is already subscribed
-	q := datastore.NewQuery(subscriptionKind).Filter("UserID =", user).Filter("Pack =", pack)
+	q := datastore.NewQuery(subscriptionKind).Filter("UserID =", user).Filter("Pack =", pack).Limit(1).KeysOnly()
 
 	var keys []*datastore.Key
-	var subscriptions []Subscription
-	keys, err := q.GetAll(ctx, &subscriptions)
+	keys, err := q.GetAll(ctx, nil)
 	if err != nil {
 		return false, err
 	}
@@ -325,95 +318,194 @@ func MySubscriptions(ctx context.Context, user int) ([]Subscription, error) {
 	return subscriptions, nil
 }
 
-// NewGif adds a new gif to pack.
-func NewGif(ctx context.Context, pack string, user int, gif Gif) error {
+func GetGif(ctx context.Context, packName, fileID string) (Gif, error) {
+	index, err := search.Open(gifsIndex)
+	if err != nil {
+		return Gif{}, err
+	}
+
+	var gif Gif
+	key := fmt.Sprintf("%s:%s", packName, fileID)
+	err = index.Get(ctx, key, &gif)
+	if err != nil {
+		if err == search.ErrNoSuchDocument {
+			return Gif{}, ErrNotFound
+		}
+
+		return Gif{}, err
+	}
+
+	return gif, nil
+}
+
+// NewGif adds a new gif to pack. Returns true if a new gif was added to the pack, false if that gif was already in the
+// pack.
+func NewGif(ctx context.Context, packName string, userID int, gif Gif) (bool, error) {
 	// todo: return additional information about whether a gif is already in a pack
 
 	// validate pack name
-	if !packNameRegex.MatchString(pack) {
-		return ErrInvalidName
+	if !packNameRegex.MatchString(packName) {
+		return false, ErrInvalidName
 	}
 
-	// check that user is the creator of pack
-	var p Pack
-	key := datastore.NewKey(ctx, packKind, pack, 0, nil)
-	err := datastore.Get(ctx, key, &p)
+	// check if user is the creator or a contributor to pack
+	pack, err := GetPack(ctx, packName)
 	if err != nil {
-		if err == datastore.ErrNoSuchEntity {
-			return ErrNotFound
-		}
-
-		return err
+		return false, err
 	}
 
-	if user != p.Creator {
-		return ErrNotAllowed
-	}
+	allowed := false
 
-	index, err := search.Open(gifsIndex)
-	if err != nil {
-		return err
-	}
-
-	_, err = index.Put(ctx, "", &gif)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// DeleteGif removes a gif from pack.
-func DeleteGif(ctx context.Context, pack string, user int, fileID string) (int, error) {
-	// validate pack name
-	if !packNameRegex.MatchString(pack) {
-		return 0, ErrInvalidName
-	}
-
-	// check that user is the creator of pack
-	var p Pack
-	key := datastore.NewKey(ctx, packKind, pack, 0, nil)
-	err := datastore.Get(ctx, key, &p)
-	if err != nil {
-		if err == datastore.ErrNoSuchEntity {
-			return 0, ErrNotFound
-		}
-
-		return 0, err
-	}
-
-	if user != p.Creator {
-		return 0, ErrNotAllowed
-	}
-
-	// get all instances of this gif in the pack
-	index, err := search.Open(gifsIndex)
-	if err != nil {
-		return 0, err
-	}
-
-	deleted := 0
-	q := fmt.Sprintf("Pack = %s AND FileID = %s", pack, fileID)
-	for t := index.Search(ctx, q, nil); ; {
-		var gif Gif
-		id, err := t.Next(&gif)
-		if err != nil {
-			if err == search.Done {
+	if userID == pack.Creator {
+		allowed = true
+	} else {
+		for _, c := range pack.Contributors {
+			if userID == c {
+				allowed = true
 				break
-			} else {
-				return deleted, err
 			}
 		}
-
-		// try to delete all gifs which have the same fileid
-		err = index.Delete(ctx, id)
-		if err != nil {
-			return deleted, err
-		}
-		deleted++
 	}
 
-	return deleted, nil
+	if !allowed {
+		return false, ErrNotAllowed
+	}
+
+	// check if gif is already in pack
+	_, err = GetGif(ctx, packName, string(gif.FileID))
+	if err != nil {
+		if err != ErrNotFound {
+			return false, err
+		}
+	} else {
+		return false, nil
+	}
+
+	// add gif to pack
+	index, err := search.Open(gifsIndex)
+	if err != nil {
+		return false, err
+	}
+
+	key := fmt.Sprintf("%s:%s", packName, gif.FileID)
+	_, err = index.Put(ctx, key, &gif)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// EditGif updates a gif's keywords. Returns true if the gif existed and was updated, false if the gif did not exist in
+// pack.
+func EditGif(ctx context.Context, packName string, userID int, gif Gif) (bool, error) {
+	// validate pack name
+	if !packNameRegex.MatchString(packName) {
+		return false, ErrInvalidName
+	}
+
+	// check if user is the creator or a contributor to pack
+	pack, err := GetPack(ctx, packName)
+	if err != nil {
+		return false, err
+	}
+
+	allowed := false
+
+	if userID == pack.Creator {
+		allowed = true
+	} else {
+		for _, c := range pack.Contributors {
+			if userID == c {
+				allowed = true
+				break
+			}
+		}
+	}
+
+	if !allowed {
+		return false, ErrNotAllowed
+	}
+
+	// check if gif is already in pack
+	_, err = GetGif(ctx, packName, string(gif.FileID))
+	if err != nil {
+		if err == ErrNotFound {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	// update gif
+	index, err := search.Open(gifsIndex)
+	if err != nil {
+		return false, err
+	}
+
+	key := fmt.Sprintf("%s:%s", packName, gif.FileID)
+	_, err = index.Put(ctx, key, &gif)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// DeleteGif removes a gif from pack. Returns true if the the gif was deleted from the pack, false if the gif was not
+// part of the pack.
+func DeleteGif(ctx context.Context, packName string, userID int, fileID string) (bool, error) {
+	// validate pack name
+	if !packNameRegex.MatchString(packName) {
+		return false, ErrInvalidName
+	}
+
+	// check that user is the creator of pack
+	pack, err := GetPack(ctx, packName)
+	if err != nil {
+		return false, err
+	}
+
+	allowed := false
+
+	if userID == pack.Creator {
+		allowed = true
+	} else {
+		for _, c := range pack.Contributors {
+			if userID == c {
+				allowed = true
+				break
+			}
+		}
+	}
+
+	if !allowed {
+		return false, ErrNotAllowed
+	}
+
+	// check if gif is already in pack
+	index, err := search.Open(gifsIndex)
+	if err != nil {
+		return false, err
+	}
+
+	var g Gif
+	key := fmt.Sprintf("%s:%s", packName, fileID)
+	err = index.Get(ctx, key, &g)
+	if err != nil {
+		if err == search.ErrNoSuchDocument {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	err = index.Delete(ctx, key)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // SearchGifs returns gifs from the search index matching query.
