@@ -1,4 +1,4 @@
-package saved_gifs_bot
+package main
 
 import (
 	"errors"
@@ -34,23 +34,26 @@ var (
 	ErrNotFound    = errors.New("pack not found")
 )
 
+// Gif represents a gif in our search index
 type Gif struct {
 	Pack     search.Atom
 	FileID   search.Atom
 	Keywords string
 }
 
+// Pack represents a gif pack in datastore
 type Pack struct {
 	Name    string
 	Creator int
 }
 
+// Subscription represents a subscription to a gif pack in datastore
 type Subscription struct {
 	User int
 	Pack string
 }
 
-// Returns true if pack was created, false if a pack with the same name already exists.
+// NewPack returns true if pack was created, false if a pack with the same name already exists.
 func NewPack(ctx context.Context, name string, creator int) (bool, error) {
 	// validate pack name
 	if !packNameRegex.MatchString(name) {
@@ -82,7 +85,7 @@ func NewPack(ctx context.Context, name string, creator int) (bool, error) {
 	return true, nil
 }
 
-// Returns a slice of packs which were created by creator
+// MyPacks returns a slice of packs which were created by creator
 func MyPacks(ctx context.Context, creator int) ([]Pack, error) {
 	q := datastore.NewQuery(packKind).Filter("Creator =", creator)
 
@@ -95,7 +98,7 @@ func MyPacks(ctx context.Context, creator int) ([]Pack, error) {
 	return packs, nil
 }
 
-// Retrieves information about a specific gif pack
+// GetPack retrieves information about a specific gif pack
 func GetPack(ctx context.Context, name string) (Pack, error) {
 	// validate pack name
 	if !packNameRegex.MatchString(name) {
@@ -108,16 +111,16 @@ func GetPack(ctx context.Context, name string) (Pack, error) {
 	if err != nil {
 		if err == datastore.ErrNoSuchEntity {
 			return Pack{}, ErrNotFound
-		} else {
-			return Pack{}, err
 		}
+
+		return Pack{}, err
 	}
 
 	return pack, nil
 }
 
-// Returns true if user was successfully subscribed to pack, false if user was already subscribed to pack.
-// Returns ErrNotFound if pack does not exist.
+// Subscribe returns true if user was successfully subscribed to pack, false if user was already subscribed to pack.
+// err will be ErrNotFound if pack does not exist.
 func Subscribe(ctx context.Context, pack string, user int) (bool, error) {
 	// validate pack name
 	if !packNameRegex.MatchString(pack) {
@@ -131,9 +134,9 @@ func Subscribe(ctx context.Context, pack string, user int) (bool, error) {
 	if err != nil {
 		if err == datastore.ErrNoSuchEntity {
 			return false, ErrNotFound
-		} else {
-			return false, err
 		}
+
+		return false, err
 	}
 
 	// check if user is already subscribed
@@ -163,7 +166,7 @@ func Subscribe(ctx context.Context, pack string, user int) (bool, error) {
 	return true, nil
 }
 
-// Returns true if user was successfully unsubscribed from pack, false if user was not subscribed to pack.
+// Unsubscribe returns true if user was successfully unsubscribed from pack, false if user was not subscribed to pack.
 // err will be ErrInvalidName if pack is not a valid pack name
 func Unsubscribe(ctx context.Context, pack string, user int) (bool, error) {
 	// validate pack name
@@ -196,6 +199,7 @@ func Unsubscribe(ctx context.Context, pack string, user int) (bool, error) {
 	return true, nil
 }
 
+// MySubscriptions returns a slice of the subscriptions a user has.
 func MySubscriptions(ctx context.Context, user int) ([]Subscription, error) {
 	q := datastore.NewQuery(subscriptionKind).Filter("User =", user)
 
@@ -208,6 +212,7 @@ func MySubscriptions(ctx context.Context, user int) ([]Subscription, error) {
 	return subscriptions, nil
 }
 
+// NewGif adds a new gif to pack.
 func NewGif(ctx context.Context, pack string, user int, gif Gif) error {
 	// todo: return additional information about whether a gif is already in a pack
 
@@ -223,9 +228,9 @@ func NewGif(ctx context.Context, pack string, user int, gif Gif) error {
 	if err != nil {
 		if err == datastore.ErrNoSuchEntity {
 			return ErrNotFound
-		} else {
-			return err
 		}
+
+		return err
 	}
 
 	if user != p.Creator {
@@ -245,7 +250,8 @@ func NewGif(ctx context.Context, pack string, user int, gif Gif) error {
 	return nil
 }
 
-func DeleteGif(ctx context.Context, pack string, user int, fileId string) (int, error) {
+// DeleteGif removes a gif from pack.
+func DeleteGif(ctx context.Context, pack string, user int, fileID string) (int, error) {
 	// validate pack name
 	if !packNameRegex.MatchString(pack) {
 		return 0, ErrInvalidName
@@ -258,9 +264,9 @@ func DeleteGif(ctx context.Context, pack string, user int, fileId string) (int, 
 	if err != nil {
 		if err == datastore.ErrNoSuchEntity {
 			return 0, ErrNotFound
-		} else {
-			return 0, err
 		}
+
+		return 0, err
 	}
 
 	if user != p.Creator {
@@ -274,7 +280,7 @@ func DeleteGif(ctx context.Context, pack string, user int, fileId string) (int, 
 	}
 
 	deleted := 0
-	q := fmt.Sprintf("Pack = %s AND FileID = %s", pack, fileId)
+	q := fmt.Sprintf("Pack = %s AND FileID = %s", pack, fileID)
 	for t := index.Search(ctx, q, nil); ; {
 		var gif Gif
 		id, err := t.Next(&gif)
@@ -297,6 +303,8 @@ func DeleteGif(ctx context.Context, pack string, user int, fileId string) (int, 
 	return deleted, nil
 }
 
+// SearchGifs returns gifs from the search index matching query.
+//
 // query is a string with the format
 //   <query> ::= <pack-name> <keywords>*
 //   <pack-name> ::= <word> | "-"
@@ -375,9 +383,9 @@ func SearchGifs(ctx context.Context, user int, query string) ([]Gif, error) {
 		if err != nil {
 			if err == datastore.ErrNoSuchEntity {
 				return nil, nil
-			} else {
-				return nil, err
 			}
+
+			return nil, err
 		}
 
 		// search for gifs

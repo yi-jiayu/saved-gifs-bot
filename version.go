@@ -1,3 +1,4 @@
-package saved_gifs_bot
+package main
 
+// Version is the current Saved GIFs Bot version string
 const Version = "0.1.0"

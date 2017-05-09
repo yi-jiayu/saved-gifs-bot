@@ -1,4 +1,4 @@
-package saved_gifs_bot
+package main
 
 import (
 	"reflect"

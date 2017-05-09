@@ -1,4 +1,4 @@
-package saved_gifs_bot
+package main
 
 import (
 	"github.com/yi-jiayu/telegram-bot-api"
@@ -6,16 +6,17 @@ import (
 	"google.golang.org/appengine/log"
 )
 
+// HandleInlineQuery handles incoming inline queries.
 func HandleInlineQuery(ctx context.Context, bot *tgbotapi.BotAPI, inlineQuery *tgbotapi.InlineQuery) {
-	id := inlineQuery.ID
-	userId := inlineQuery.From.ID
+	inlineQueryID := inlineQuery.ID
+	userID := inlineQuery.From.ID
 	query := inlineQuery.Query
 
 	if query == "" {
 		return
 	}
 
-	gifs, err := SearchGifs(ctx, userId, query)
+	gifs, err := SearchGifs(ctx, userID, query)
 	if err != nil {
 		log.Errorf(ctx, "%v", err)
 	}
@@ -28,14 +29,14 @@ func HandleInlineQuery(ctx context.Context, bot *tgbotapi.BotAPI, inlineQuery *t
 			gifsMap[string(gif.FileID)] = 0
 		}
 
-		for fileId := range gifsMap {
-			id := string(fileId)
+		for fileID := range gifsMap {
+			id := string(fileID)
 			results = append(results, NewInlineQueryResultCachedMpeg4Gif(id, id))
 		}
 	}
 
 	config := tgbotapi.InlineConfig{
-		InlineQueryID: id,
+		InlineQueryID: inlineQueryID,
 		Results:       results,
 		IsPersonal:    true,
 	}

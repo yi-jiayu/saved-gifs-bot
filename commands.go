@@ -1,4 +1,4 @@
-package saved_gifs_bot
+package main
 
 import (
 	"fmt"
@@ -9,13 +9,13 @@ import (
 
 var commandHandlers = map[string]MessageHandler{
 	"newpack": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
-		user := message.From.ID
-		chatId := message.Chat.ID
+		userID := message.From.ID
+		chatID := message.Chat.ID
 
 		var text string
 		done := false
 		if name := message.CommandArguments(); name != "" {
-			created, err := NewPack(ctx, name, user)
+			created, err := NewPack(ctx, name, userID)
 			if err != nil {
 				if err == ErrInvalidName {
 					text = "Oh no! That was not a valid pack name. A pack name can only contain letters, numbers, hyphens and underscores."
@@ -41,13 +41,13 @@ var commandHandlers = map[string]MessageHandler{
 				"action": "newpack",
 			}
 
-			err := SetConversationState(ctx, chatId, user, state)
+			err := SetConversationState(ctx, chatID, userID, state)
 			if err != nil {
 				return err
 			}
 		}
 
-		reply := tgbotapi.NewMessage(chatId, text)
+		reply := tgbotapi.NewMessage(chatID, text)
 		if !message.Chat.IsPrivate() {
 			reply.ReplyToMessageID = message.MessageID
 
@@ -67,26 +67,26 @@ var commandHandlers = map[string]MessageHandler{
 		return nil
 	},
 	"mypacks": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
-		user := message.From.ID
-		chatId := message.Chat.ID
+		userID := message.From.ID
+		chatID := message.Chat.ID
 
 		var text string
-		packs, err := MyPacks(ctx, user)
+		packs, err := MyPacks(ctx, userID)
 		if err != nil {
 			return err
-		} else {
-			if len(packs) > 0 {
-				text = "Here are the gif packs you have created: \n"
-
-				for i, pack := range packs {
-					text += fmt.Sprintf("%d. %s\n", i+1, pack.Name)
-				}
-			} else {
-				text = "Oops! It looks like you haven't created any gif packs yet."
-			}
 		}
 
-		reply := tgbotapi.NewMessage(chatId, text)
+		if len(packs) > 0 {
+			text = "Here are the gif packs you have created: \n"
+
+			for i, pack := range packs {
+				text += fmt.Sprintf("%d. %s\n", i+1, pack.Name)
+			}
+		} else {
+			text = "Oops! It looks like you haven't created any gif packs yet."
+		}
+
+		reply := tgbotapi.NewMessage(chatID, text)
 		_, err = bot.Send(reply)
 		if err != nil {
 			return err
@@ -95,13 +95,13 @@ var commandHandlers = map[string]MessageHandler{
 		return nil
 	},
 	"subscribe": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
-		user := message.From.ID
-		chatId := message.Chat.ID
+		userID := message.From.ID
+		chatID := message.Chat.ID
 
 		var text string
 		done := false
 		if packName := message.CommandArguments(); packName != "" {
-			subscribed, err := Subscribe(ctx, packName, user)
+			subscribed, err := Subscribe(ctx, packName, userID)
 			if err != nil {
 				if err == ErrNotFound {
 					text = "Oops! There doesn't seem to be any gif pack with that name."
@@ -127,13 +127,13 @@ var commandHandlers = map[string]MessageHandler{
 				"action": "subscribe",
 			}
 
-			err := SetConversationState(ctx, chatId, user, state)
+			err := SetConversationState(ctx, chatID, userID, state)
 			if err != nil {
 				return err
 			}
 		}
 
-		reply := tgbotapi.NewMessage(chatId, text)
+		reply := tgbotapi.NewMessage(chatID, text)
 		if !message.Chat.IsPrivate() {
 			reply.ReplyToMessageID = message.MessageID
 
@@ -153,13 +153,13 @@ var commandHandlers = map[string]MessageHandler{
 		return nil
 	},
 	"unsubscribe": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
-		user := message.From.ID
-		chatId := message.Chat.ID
+		userID := message.From.ID
+		chatID := message.Chat.ID
 
 		var text string
 		done := false
 		if packName := message.CommandArguments(); packName != "" {
-			unsubscribed, err := Unsubscribe(ctx, packName, user)
+			unsubscribed, err := Unsubscribe(ctx, packName, userID)
 			if err != nil {
 				if err == ErrInvalidName {
 					text = "Oh no! That was not a valid pack name. Pack names can only contain letter, numbers, hyphens and underscores."
@@ -185,13 +185,13 @@ var commandHandlers = map[string]MessageHandler{
 				"action": "unsubscribe",
 			}
 
-			err := SetConversationState(ctx, chatId, user, state)
+			err := SetConversationState(ctx, chatID, userID, state)
 			if err != nil {
 				return err
 			}
 		}
 
-		reply := tgbotapi.NewMessage(chatId, text)
+		reply := tgbotapi.NewMessage(chatID, text)
 		if !message.Chat.IsPrivate() {
 			reply.ReplyToMessageID = message.MessageID
 
@@ -211,26 +211,26 @@ var commandHandlers = map[string]MessageHandler{
 		return nil
 	},
 	"subscriptions": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
-		user := message.From.ID
-		chatId := message.Chat.ID
+		userID := message.From.ID
+		chatID := message.Chat.ID
 
 		var text string
-		subscriptions, err := MySubscriptions(ctx, user)
+		subscriptions, err := MySubscriptions(ctx, userID)
 		if err != nil {
 			return err
-		} else {
-			if len(subscriptions) > 0 {
-				text = "Here are the packs you are currently subscribed to: \n"
-
-				for i, subscription := range subscriptions {
-					text += fmt.Sprintf("%d. %s\n", i+1, subscription.Pack)
-				}
-			} else {
-				text = "Oops! It looks like you haven't subscribed to any packs yet."
-			}
 		}
 
-		reply := tgbotapi.NewMessage(chatId, text)
+		if len(subscriptions) > 0 {
+			text = "Here are the packs you are currently subscribed to: \n"
+
+			for i, subscription := range subscriptions {
+				text += fmt.Sprintf("%d. %s\n", i+1, subscription.Pack)
+			}
+		} else {
+			text = "Oops! It looks like you haven't subscribed to any packs yet."
+		}
+
+		reply := tgbotapi.NewMessage(chatID, text)
 		_, err = bot.Send(reply)
 		if err != nil {
 			return err
@@ -239,8 +239,8 @@ var commandHandlers = map[string]MessageHandler{
 		return err
 	},
 	"newgif": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
-		user := message.From.ID
-		chatId := message.Chat.ID
+		userID := message.From.ID
+		chatID := message.Chat.ID
 
 		var reply tgbotapi.MessageConfig
 		packName := message.CommandArguments()
@@ -250,26 +250,27 @@ var commandHandlers = map[string]MessageHandler{
 			if err != nil {
 				if err == ErrNotFound {
 					text := "Oh no! That pack does not exist. Did you spell it correctly?"
-					reply = tgbotapi.NewMessage(chatId, text)
+					reply = tgbotapi.NewMessage(chatID, text)
 				} else {
 					return err
 				}
 			} else {
-				if pack.Creator == user {
+				if pack.Creator == userID {
 					state := map[string]string{
 						"action": "newgif",
 						"pack":   packName,
 					}
-					err := SetConversationState(ctx, chatId, user, state)
+					err := SetConversationState(ctx, chatID, userID, state)
 					if err != nil {
 						return err
-					} else {
-						text := "Please send me the gif you want to add to this pack."
-						reply = tgbotapi.NewMessage(chatId, text)
 					}
+
+					text := "Please send me the gif you want to add to this pack."
+					reply = tgbotapi.NewMessage(chatID, text)
+
 				} else {
 					text := "Oops, it seems like you are not the creator of this pack. Only the pack creator can add gifs to a pack."
-					reply = tgbotapi.NewMessage(chatId, text)
+					reply = tgbotapi.NewMessage(chatID, text)
 				}
 			}
 
@@ -277,13 +278,14 @@ var commandHandlers = map[string]MessageHandler{
 			state := map[string]string{
 				"action": "newgif",
 			}
-			err := SetConversationState(ctx, chatId, user, state)
+			err := SetConversationState(ctx, chatID, userID, state)
 			if err != nil {
 				return err
-			} else {
-				text := "Which pack do you want to add a new gif to?"
-				reply = tgbotapi.NewMessage(chatId, text)
 			}
+
+			text := "Which pack do you want to add a new gif to?"
+			reply = tgbotapi.NewMessage(chatID, text)
+
 		}
 
 		if !message.Chat.IsPrivate() {
@@ -302,8 +304,8 @@ var commandHandlers = map[string]MessageHandler{
 		return nil
 	},
 	"deletegif": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
-		chatId := message.Chat.ID
-		userId := message.From.ID
+		userID := message.From.ID
+		chatID := message.Chat.ID
 
 		var state map[string]string
 		var text string
@@ -334,13 +336,13 @@ var commandHandlers = map[string]MessageHandler{
 		}
 
 		if !done {
-			err := SetConversationState(ctx, chatId, userId, state)
+			err := SetConversationState(ctx, chatID, userID, state)
 			if err != nil {
 				return err
 			}
 		}
 
-		reply := tgbotapi.NewMessage(chatId, text)
+		reply := tgbotapi.NewMessage(chatID, text)
 
 		if !message.Chat.IsPrivate() {
 			reply.ReplyToMessageID = message.MessageID
@@ -360,8 +362,8 @@ var commandHandlers = map[string]MessageHandler{
 		return nil
 	},
 	"version": func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
-		chatId := message.Chat.ID
-		reply := tgbotapi.NewMessage(chatId, fmt.Sprintf("Saved GIFs Bot version %s", Version))
+		chatID := message.Chat.ID
+		reply := tgbotapi.NewMessage(chatID, fmt.Sprintf("Saved GIFs Bot version %s", Version))
 		_, err := bot.Send(reply)
 		if err != nil {
 			return err
@@ -371,4 +373,5 @@ var commandHandlers = map[string]MessageHandler{
 	},
 }
 
+// MessageHandler represents a function which handles an incoming message.
 type MessageHandler func(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error

@@ -1,4 +1,4 @@
-package saved_gifs_bot
+package main
 
 import (
 	"bytes"
@@ -11,20 +11,22 @@ import (
 
 const conversationStateKind = "ConversationState"
 
+// ConversationState represents a stored conversation state in datastore
 type ConversationState struct {
 	State []byte
 }
 
-func GetConversationState(ctx context.Context, chatId int64, userId int) (map[string]string, error) {
-	key := datastore.NewKey(ctx, conversationStateKind, fmt.Sprintf("%d:%d", chatId, userId), 0, nil)
+// GetConversationState retrieves the current conversation state for userID in chatID
+func GetConversationState(ctx context.Context, chatID int64, userID int) (map[string]string, error) {
+	key := datastore.NewKey(ctx, conversationStateKind, fmt.Sprintf("%d:%d", chatID, userID), 0, nil)
 	var s ConversationState
 	err := datastore.Get(ctx, key, &s)
 	if err != nil {
 		if err == datastore.ErrNoSuchEntity {
 			return nil, nil
-		} else {
-			return nil, err
 		}
+
+		return nil, err
 	}
 
 	var state map[string]string
@@ -38,7 +40,8 @@ func GetConversationState(ctx context.Context, chatId int64, userId int) (map[st
 	return state, nil
 }
 
-func SetConversationState(ctx context.Context, chatId int64, userId int, state map[string]string) error {
+// SetConversationState sets the conversation state for userID in chatID.
+func SetConversationState(ctx context.Context, chatID int64, userID int, state map[string]string) error {
 	var b bytes.Buffer
 	e := gob.NewEncoder(&b)
 	err := e.Encode(state)
@@ -50,7 +53,7 @@ func SetConversationState(ctx context.Context, chatId int64, userId int, state m
 		State: b.Bytes(),
 	}
 
-	key := datastore.NewKey(ctx, conversationStateKind, fmt.Sprintf("%d:%d", chatId, userId), 0, nil)
+	key := datastore.NewKey(ctx, conversationStateKind, fmt.Sprintf("%d:%d", chatID, userID), 0, nil)
 	_, err = datastore.Put(ctx, key, &s)
 	if err != nil {
 		return err

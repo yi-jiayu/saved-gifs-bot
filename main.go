@@ -1,4 +1,4 @@
-package saved_gifs_bot
+package main
 
 import (
 	"encoding/json"
@@ -15,20 +15,20 @@ import (
 )
 
 type InlineQueryResultCachedMpeg4Gif struct {
-	Type                string                         `json:"type"`
-	Id                  string                         `json:"id"`
-	Mpeg4FileId         string                         `json:"mpeg4_file_id"`
+	Type                string                         `json:"type"`          // required
+	ID                  string                         `json:"id"`            // required
+	Mpeg4FileID         string                         `json:"mpeg4_file_id"` // required
 	Title               string                         `json:"title"`
 	Caption             string                         `json:"caption"`
 	ReplyMarkup         *tgbotapi.InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 	InputMessageContent interface{}                    `json:"input_message_content,omitempty"`
 }
 
-func NewInlineQueryResultCachedMpeg4Gif(id, fileId string) InlineQueryResultCachedMpeg4Gif {
+func NewInlineQueryResultCachedMpeg4Gif(id, fileID string) InlineQueryResultCachedMpeg4Gif {
 	return InlineQueryResultCachedMpeg4Gif{
 		Type:        "mpeg4_gif",
-		Id:          id,
-		Mpeg4FileId: fileId,
+		ID:          id,
+		Mpeg4FileID: fileID,
 	}
 }
 
@@ -101,6 +101,8 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// SomethingWentWrong replies to a message saying that something went wrong and provides a request id for reporting the
+// error.
 func SomethingWentWrong(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message, err error) {
 	log.Errorf(ctx, "%v", err)
 	text := fmt.Sprintf("Oh no! Something went wrong. Request Id: `%s`", appengine.RequestID(ctx))
