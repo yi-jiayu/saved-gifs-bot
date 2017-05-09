@@ -71,19 +71,31 @@ var commandHandlers = map[string]MessageHandler{
 		chatID := message.Chat.ID
 
 		var text string
-		packs, err := MyPacks(ctx, userID)
+		userPacks, err := MyPacks(ctx, userID)
 		if err != nil {
 			return err
 		}
 
-		if len(packs) > 0 {
-			text = "Here are the gif packs you have created: \n"
+		// enumerate packs user has created
+		if len(userPacks.IsCreator) > 0 {
+			text += "Here are the gif packs you have created:\n"
 
-			for i, pack := range packs {
+			for i, pack := range userPacks.IsCreator {
 				text += fmt.Sprintf("%d. %s\n", i+1, pack.Name)
 			}
 		} else {
-			text = "Oops! It looks like you haven't created any gif packs yet."
+			text += "You have not created any gif packs.\n"
+		}
+
+		// enumerate packs user is a contributor to
+		if len(userPacks.IsContributor) > 0 {
+			text += "Here are the gif packs you are a contributor to:\n"
+
+			for i, pack := range userPacks.IsContributor {
+				text += fmt.Sprintf("%d. %s\n", i+1, pack.Name)
+			}
+		} else {
+			text += "You are not a contributor to any gif packs."
 		}
 
 		reply := tgbotapi.NewMessage(chatID, text)
