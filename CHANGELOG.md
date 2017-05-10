@@ -1,6 +1,6 @@
 # Change Log
 
-## v0.1.4 - 2017-05-10
+## v0.2.0 - 2017-05-10
 ### Changed
 - Standardised multiple step commands to allow user to retry invalid input
 - Added explicit `/cancel` command to exit multiple step commands.
