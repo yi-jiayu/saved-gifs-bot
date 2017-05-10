@@ -318,6 +318,7 @@ func MySubscriptions(ctx context.Context, user int) ([]Subscription, error) {
 	return subscriptions, nil
 }
 
+// GetGif is a convenience wrapper to get a gif by packName and fileID from the search index
 func GetGif(ctx context.Context, packName, fileID string) (Gif, error) {
 	index, err := search.Open(gifsIndex)
 	if err != nil {
@@ -338,11 +339,24 @@ func GetGif(ctx context.Context, packName, fileID string) (Gif, error) {
 	return gif, nil
 }
 
+// HasEditPermissions returns true if userID is the creator of pack or a contributor to pack.
+func HasEditPermissions(pack Pack, userID int) bool {
+	if userID == pack.Creator {
+		return true
+	}
+
+	for _, c := range pack.Contributors {
+		if userID == c {
+			return true
+		}
+	}
+
+	return false
+}
+
 // NewGif adds a new gif to pack. Returns true if a new gif was added to the pack, false if that gif was already in the
 // pack.
 func NewGif(ctx context.Context, packName string, userID int, gif Gif) (bool, error) {
-	// todo: return additional information about whether a gif is already in a pack
-
 	// validate pack name
 	if !packNameRegex.MatchString(packName) {
 		return false, ErrInvalidName
@@ -354,20 +368,7 @@ func NewGif(ctx context.Context, packName string, userID int, gif Gif) (bool, er
 		return false, err
 	}
 
-	allowed := false
-
-	if userID == pack.Creator {
-		allowed = true
-	} else {
-		for _, c := range pack.Contributors {
-			if userID == c {
-				allowed = true
-				break
-			}
-		}
-	}
-
-	if !allowed {
+	if !HasEditPermissions(pack, userID) {
 		return false, ErrNotAllowed
 	}
 
@@ -410,20 +411,7 @@ func EditGif(ctx context.Context, packName string, userID int, gif Gif) (bool, e
 		return false, err
 	}
 
-	allowed := false
-
-	if userID == pack.Creator {
-		allowed = true
-	} else {
-		for _, c := range pack.Contributors {
-			if userID == c {
-				allowed = true
-				break
-			}
-		}
-	}
-
-	if !allowed {
+	if !HasEditPermissions(pack, userID) {
 		return false, ErrNotAllowed
 	}
 
@@ -466,20 +454,7 @@ func DeleteGif(ctx context.Context, packName string, userID int, fileID string) 
 		return false, err
 	}
 
-	allowed := false
-
-	if userID == pack.Creator {
-		allowed = true
-	} else {
-		for _, c := range pack.Contributors {
-			if userID == c {
-				allowed = true
-				break
-			}
-		}
-	}
-
-	if !allowed {
+	if !HasEditPermissions(pack, userID) {
 		return false, ErrNotAllowed
 	}
 

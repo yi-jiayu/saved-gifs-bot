@@ -16,6 +16,7 @@ var commandHandlers = map[string]MessageHandler{
 	"newgif":        cmdNewGifHandler,
 	"deletegif":     cmdDeleteGifHandler,
 	"version":       cmdVersionHandler,
+	"cancel":        cmdCancelHandler,
 }
 
 // MessageHandler represents a function which handles an incoming message.
@@ -50,8 +51,8 @@ func cmdNewPackHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbot
 	}
 
 	if !done {
-		state := map[string]string{
-			"action": "newpack",
+		state := ConversationState{
+			State: stateNewPackWaitPackName,
 		}
 
 		err := SetConversationState(ctx, chatID, userID, state)
@@ -150,8 +151,8 @@ func cmdSubscribeHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgb
 	}
 
 	if !done {
-		state := map[string]string{
-			"action": "subscribe",
+		state := ConversationState{
+			State: stateSubscribeWaitPackName,
 		}
 
 		err := SetConversationState(ctx, chatID, userID, state)
@@ -209,8 +210,8 @@ func cmdUnsubscribeHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *t
 	}
 
 	if !done {
-		state := map[string]string{
-			"action": "unsubscribe",
+		state := ConversationState{
+			State: stateUnsubscribeWaitPackName,
 		}
 
 		err := SetConversationState(ctx, chatID, userID, state)
@@ -286,10 +287,13 @@ func cmdNewGifHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbota
 			}
 		} else {
 			if pack.Creator == userID {
-				state := map[string]string{
-					"action": "newgif",
-					"pack":   packName,
+				state := ConversationState{
+					State: stateNewGifWaitGif,
+					Data: map[string]string{
+						"packName": packName,
+					},
 				}
+
 				err := SetConversationState(ctx, chatID, userID, state)
 				if err != nil {
 					return err
@@ -305,9 +309,10 @@ func cmdNewGifHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbota
 		}
 
 	} else {
-		state := map[string]string{
-			"action": "newgif",
+		state := ConversationState{
+			State: stateNewGifWaitPackName,
 		}
+
 		err := SetConversationState(ctx, chatID, userID, state)
 		if err != nil {
 			return err
@@ -338,7 +343,7 @@ func cmdDeleteGifHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgb
 	userID := message.From.ID
 	chatID := message.Chat.ID
 
-	var state map[string]string
+	var state ConversationState
 	var text string
 	done := false
 	if packName := message.CommandArguments(); packName != "" {
@@ -351,16 +356,18 @@ func cmdDeleteGifHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgb
 				return err
 			}
 		} else {
-			state = map[string]string{
-				"action": "deletegif",
-				"pack":   packName,
+			state = ConversationState{
+				State: stateDeleteGifWaitGif,
+				Data: map[string]string{
+					"packName": packName,
+				},
 			}
 
 			text = "Please send me the gif you want to delete from this pack."
 		}
 	} else {
-		state = map[string]string{
-			"action": "deletegif",
+		state = ConversationState{
+			State: stateDeleteGifWaitPackName,
 		}
 
 		text = "Which gif pack do you want to delete a gif from?"
@@ -396,6 +403,18 @@ func cmdDeleteGifHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgb
 func cmdVersionHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
 	chatID := message.Chat.ID
 	reply := tgbotapi.NewMessage(chatID, fmt.Sprintf("Saved GIFs Bot version %s", Version))
+	_, err := bot.Send(reply)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func cmdCancelHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
+	chatID := message.Chat.ID
+
+	reply := tgbotapi.NewMessage(chatID, "Command cancelled!")
 	_, err := bot.Send(reply)
 	if err != nil {
 		return err

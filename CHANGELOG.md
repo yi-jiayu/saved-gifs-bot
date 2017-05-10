@@ -1,6 +1,11 @@
 # Change Log
 
-## v0.1.3
+## v0.1.4 - 2017-05-10
+### Changed
+- Standardised multiple step commands to allow user to retry invalid input
+- Added explicit `/cancel` command to exit multiple step commands.
+
+## v0.1.3 - 2017-05-10
 ### Changed
 - `/newgif` will no longer add duplicate gifs to a pack.
 - `/newgif` will report if a gif is already in a pack after sending a gif.

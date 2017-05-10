@@ -70,8 +70,7 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 		if command := message.Command(); command != "" {
 			if handler, exists := commandHandlers[command]; exists {
 				// clear bot state before a new command
-				state := make(map[string]string)
-				err := SetConversationState(ctx, message.Chat.ID, message.From.ID, state)
+				err := ClearConversationState(ctx, message.Chat.ID, message.From.ID)
 				if err != nil {
 					SomethingWentWrong(ctx, &bot, message, err)
 					return
