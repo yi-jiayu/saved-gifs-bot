@@ -4,6 +4,7 @@ package main
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"golang.org/x/net/context"
@@ -44,6 +45,8 @@ func NewContext(opts *aetest.Options) (context.Context, func(), error) {
 }
 
 func TestNewPack(t *testing.T) {
+	t.Parallel()
+
 	ctx, done, err := aetest.NewContext()
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +58,7 @@ func TestNewPack(t *testing.T) {
 		Creator: 1,
 	}
 
-	key := datastore.NewKey(ctx, packKind, pack1.Name, 0, nil)
+	key := datastore.NewKey(ctx, packKind, strings.ToUpper(pack1.Name), 0, nil)
 	_, err = datastore.Put(ctx, key, &pack1)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -103,6 +106,8 @@ func TestNewPack(t *testing.T) {
 }
 
 func TestNewContributor(t *testing.T) {
+	t.Parallel()
+
 	ctx, done, err := aetest.NewContext()
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +120,7 @@ func TestNewContributor(t *testing.T) {
 		Contributors: []int{2},
 	}
 
-	key := datastore.NewKey(ctx, packKind, pack1.Name, 0, nil)
+	key := datastore.NewKey(ctx, packKind, strings.ToUpper(pack1.Name), 0, nil)
 	_, err = datastore.Put(ctx, key, &pack1)
 	if err != nil {
 		t.Fatal(err)
@@ -175,6 +180,8 @@ func TestNewContributor(t *testing.T) {
 }
 
 func TestDeleteContributor(t *testing.T) {
+	t.Parallel()
+
 	ctx, done, err := aetest.NewContext()
 	if err != nil {
 		t.Fatal(err)
@@ -187,7 +194,7 @@ func TestDeleteContributor(t *testing.T) {
 		Contributors: []int{2},
 	}
 
-	key := datastore.NewKey(ctx, packKind, pack1.Name, 0, nil)
+	key := datastore.NewKey(ctx, packKind, strings.ToUpper(pack1.Name), 0, nil)
 	_, err = datastore.Put(ctx, key, &pack1)
 	if err != nil {
 		t.Fatal(err)
@@ -247,6 +254,8 @@ func TestDeleteContributor(t *testing.T) {
 }
 
 func TestSubscribe(t *testing.T) {
+	t.Parallel()
+
 	ctx, done, err := NewContext(&aetest.Options{
 		StronglyConsistentDatastore: true,
 	})
@@ -262,10 +271,10 @@ func TestSubscribe(t *testing.T) {
 
 	subscription1 := Subscription{
 		UserID: 1,
-		Pack:   "pack1",
+		Pack:   "PACK1",
 	}
 
-	key1 := datastore.NewKey(ctx, packKind, pack1.Name, 0, nil)
+	key1 := datastore.NewKey(ctx, packKind, strings.ToUpper(pack1.Name), 0, nil)
 	key2 := datastore.NewIncompleteKey(ctx, subscriptionKind, nil)
 
 	_, err1 := datastore.Put(ctx, key1, &pack1)

@@ -9,6 +9,8 @@ import (
 )
 
 func TestGetConversationState(t *testing.T) {
+	t.Parallel()
+
 	ctx, done, err := aetest.NewContext()
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -44,6 +46,8 @@ func TestGetConversationState(t *testing.T) {
 }
 
 func TestSetConversationState(t *testing.T) {
+	t.Parallel()
+
 	ctx, done, err := aetest.NewContext()
 	if err != nil {
 		t.Fatalf("%v", err)

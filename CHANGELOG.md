@@ -1,5 +1,10 @@
 # Change Log
 
+## v0.2.1 - 2017-05-11
+### Changed
+- Normalise pack names using `strings.ToUpper` when storing in datastore
+- Use `t.Parallel()` to speed up tests
+
 ## v0.2.0 - 2017-05-10
 ### Changed
 - Standardised multiple step commands to allow user to retry invalid input
