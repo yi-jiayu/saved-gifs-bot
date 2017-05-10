@@ -251,14 +251,14 @@ func Subscribe(ctx context.Context, packName string, userID int) (bool, error) {
 	}
 
 	// check if userID is already subscribed
-	q := datastore.NewQuery(subscriptionKind).Filter("UserID =", userID).Filter("Pack =", packName).Limit(1).KeysOnly()
-
-	keys, err := q.GetAll(ctx, nil)
+	var s Subscription
+	key := datastore.NewKey(ctx, subscriptionKind, fmt.Sprintf("%d:%s", userID, packName), 0, nil)
+	err = datastore.Get(ctx, key, &s)
 	if err != nil {
-		return false, err
-	}
-
-	if len(keys) > 0 {
+		if err != datastore.ErrNoSuchEntity {
+			return false, err
+		}
+	} else {
 		return false, nil
 	}
 
@@ -267,7 +267,6 @@ func Subscribe(ctx context.Context, packName string, userID int) (bool, error) {
 		Pack:   packName,
 	}
 
-	key := datastore.NewIncompleteKey(ctx, subscriptionKind, nil)
 	_, err = datastore.Put(ctx, key, &subscription)
 	if err != nil {
 		return false, err
@@ -278,7 +277,7 @@ func Subscribe(ctx context.Context, packName string, userID int) (bool, error) {
 
 // Unsubscribe returns true if user was successfully unsubscribed from pack, false if user was not subscribed to pack.
 // err will be ErrInvalidName if pack is not a valid pack name
-func Unsubscribe(ctx context.Context, packName string, user int) (bool, error) {
+func Unsubscribe(ctx context.Context, packName string, userID int) (bool, error) {
 	// validate pack name
 	if !packNameRegex.MatchString(packName) {
 		return false, ErrInvalidName
@@ -287,25 +286,27 @@ func Unsubscribe(ctx context.Context, packName string, user int) (bool, error) {
 	// normalise pack name
 	packName = strings.ToUpper(packName)
 
-	// check if user is already subscribed
-	q := datastore.NewQuery(subscriptionKind).Filter("UserID =", user).Filter("Pack =", packName).Limit(1).KeysOnly()
-
-	var keys []*datastore.Key
-	keys, err := q.GetAll(ctx, nil)
+	// check if pack exists
+	_, err := GetPack(ctx, packName)
 	if err != nil {
 		return false, err
 	}
 
-	if len(keys) == 0 {
-		return false, nil
+	// check if userID is already subscribed
+	var s Subscription
+	key := datastore.NewKey(ctx, subscriptionKind, fmt.Sprintf("%d:%s", userID, packName), 0, nil)
+	err = datastore.Get(ctx, key, &s)
+	if err != nil {
+		if err == datastore.ErrNoSuchEntity {
+			return false, nil
+		}
+
+		return false, err
 	}
 
-	// just delete all keys even though we only expect one to match
-	for _, key := range keys {
-		err := datastore.Delete(ctx, key)
-		if err != nil {
-			return false, err
-		}
+	err = datastore.Delete(ctx, key)
+	if err != nil {
+		return false, err
 	}
 
 	return true, nil

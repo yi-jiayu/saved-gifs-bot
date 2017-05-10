@@ -275,7 +275,7 @@ func TestSubscribe(t *testing.T) {
 	}
 
 	key1 := datastore.NewKey(ctx, packKind, strings.ToUpper(pack1.Name), 0, nil)
-	key2 := datastore.NewIncompleteKey(ctx, subscriptionKind, nil)
+	key2 := datastore.NewKey(ctx, subscriptionKind, "1:PACK1", 0, nil)
 
 	_, err1 := datastore.Put(ctx, key1, &pack1)
 	if err1 != nil {
@@ -310,6 +310,73 @@ func TestSubscribe(t *testing.T) {
 	})
 	t.Run("ok", func(t *testing.T) {
 		ok, err := Subscribe(ctx, pack1.Name, 2)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+
+		if !ok {
+			t.Fail()
+		}
+	})
+}
+
+func TestUnsubscribe(t *testing.T) {
+	t.Parallel()
+
+	ctx, done, err := NewContext(&aetest.Options{
+		StronglyConsistentDatastore: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer done()
+
+	pack1 := Pack{
+		Name:    "pack1",
+		Creator: 1,
+	}
+
+	subscription1 := Subscription{
+		UserID: 1,
+		Pack:   "PACK1",
+	}
+
+	key1 := datastore.NewKey(ctx, packKind, strings.ToUpper(pack1.Name), 0, nil)
+	key2 := datastore.NewKey(ctx, subscriptionKind, "1:PACK1", 0, nil)
+
+	_, err1 := datastore.Put(ctx, key1, &pack1)
+	if err1 != nil {
+		t.Fatalf("%v", err1)
+	}
+	_, err2 := datastore.Put(ctx, key2, &subscription1)
+	if err2 != nil {
+		t.Fatalf("%v", err2)
+	}
+
+	t.Run("nonexistent pack", func(t *testing.T) {
+		_, err := Unsubscribe(ctx, "pack2", 1)
+		if err != nil {
+			if err != ErrNotFound {
+				t.Fatalf("%v", err)
+			}
+
+			return
+		}
+
+		t.Fail()
+	})
+	t.Run("not subscribed", func(t *testing.T) {
+		ok, err := Unsubscribe(ctx, pack1.Name, 2)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+
+		if ok {
+			t.Fail()
+		}
+	})
+	t.Run("ok", func(t *testing.T) {
+		ok, err := Unsubscribe(ctx, pack1.Name, subscription1.UserID)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}

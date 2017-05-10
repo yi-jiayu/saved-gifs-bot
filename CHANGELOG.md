@@ -1,5 +1,9 @@
 # Change Log
 
+## v0.2.2 - 2017-05-11
+### Changed
+- Directly check for the existence of and delete subscriptions by key rather than a filter query
+
 ## v0.2.1 - 2017-05-11
 ### Changed
 - Normalise pack names using `strings.ToUpper` when storing in datastore
