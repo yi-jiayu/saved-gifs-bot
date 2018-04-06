@@ -1,6 +1,8 @@
 language: go
 go:
-- '1.8.1'
+- '1.8.x'
+- '1.9.x'
+- '1.10.x'
 cache:
   directories:
     - "$HOME/google-cloud-sdk/"
