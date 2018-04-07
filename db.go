@@ -600,20 +600,70 @@ func SearchGifs(ctx context.Context, user int, query string) ([]Gif, error) {
 	return results, nil
 }
 
-		for t := gIndex.Search(ctx, q, nil); ; {
-			var gif Gif
-			_, err := t.Next(&gif)
-			if err != nil {
-				if err == search.Done {
-					break
-				} else {
-					return nil, err
-				}
-			}
-
-			results = append(results, gif)
-		}
+func DeletePack(ctx context.Context, packName string, userID int) (bool, error) {
+	// validate pack name
+	if !packNameRegex.MatchString(packName) {
+		return false, ErrInvalidName
 	}
 
-	return results, nil
+	// normalise pack name
+	packName = strings.ToUpper(packName)
+
+	// check that user is the creator of pack
+	pack, err := GetPack(ctx, packName)
+	if err != nil {
+		return false, err
+	}
+
+	if pack.Creator != userID {
+		return false, ErrNotAllowed
+	}
+
+	// delete pack
+	key := datastore.NewKey(ctx, packKind, packName, 0, nil)
+	err = datastore.Delete(ctx, key)
+	if err != nil {
+		return false, err
+	}
+
+	// delete subscriptions
+	q1 := datastore.NewQuery(subscriptionKind).Filter("Pack =", packName)
+	keys, err := q1.KeysOnly().GetAll(ctx, nil) // result count is expected to be small (hopefully for now)
+	if err != nil {
+		return false, err
+	}
+
+	err = datastore.DeleteMulti(ctx, keys)
+	if err != nil {
+		return false, err
+	}
+
+	// delete gifs
+	// open gifs index
+	index, err := search.Open(gifsIndex)
+	if err != nil {
+		return nil, err
+	}
+
+	q2 := "Pack = " + packName
+	var ids []string
+	for t := index.Search(ctx, q2, &search.SearchOptions{IDsOnly: true}); ; {
+		id, err := t.Next(nil)
+		if err == search.Done {
+			break
+		}
+
+		if err != nil {
+			continue
+		}
+
+		ids = append(ids, id)
+	}
+
+	err = index.DeleteMulti(ctx, ids)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
