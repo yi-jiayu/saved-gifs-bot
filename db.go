@@ -642,7 +642,7 @@ func DeletePack(ctx context.Context, packName string, userID int) (bool, error) 
 	// open gifs index
 	index, err := search.Open(gifsIndex)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
 	q2 := "Pack = " + packName
