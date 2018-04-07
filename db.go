@@ -523,6 +523,7 @@ func SearchGifs(ctx context.Context, user int, query string) ([]Gif, error) {
 		keywords = split[1:]
 	}
 
+	var packs []string
 	var results []Gif
 	if packName == "-" {
 		// get all packs user is subscribed to
@@ -539,35 +540,9 @@ func SearchGifs(ctx context.Context, user int, query string) ([]Gif, error) {
 			return nil, nil
 		}
 
-		// search for gifs
-		gIndex, err := search.Open(gifsIndex)
-		if err != nil {
-			return nil, err
-		}
-
 		for _, s := range subscriptions {
 			packName := strings.ToUpper(s.Pack)
-
-			var q string
-			if len(keywords) > 0 {
-				q = fmt.Sprintf("Pack = %s AND Keywords = (%s)", packName, strings.Join(keywords, " OR "))
-			} else {
-				q = fmt.Sprintf("Pack = %s", packName)
-			}
-
-			for t := gIndex.Search(ctx, q, nil); ; {
-				var gif Gif
-				_, err := t.Next(&gif)
-				if err != nil {
-					if err == search.Done {
-						break
-					} else {
-						return nil, err
-					}
-				}
-
-				results = append(results, gif)
-			}
+			packs = append(packs, packName)
 		}
 	} else {
 		// check if pack exists
@@ -583,21 +558,47 @@ func SearchGifs(ctx context.Context, user int, query string) ([]Gif, error) {
 			return nil, err
 		}
 
-		// search for gifs
-		gIndex, err := search.Open(gifsIndex)
-		if err != nil {
-			return nil, err
-		}
-
 		// normalise pack name
-		packName = strings.ToUpper(packName)
+		packName := strings.ToUpper(packName)
+		packs = []string{packName}
+	}
 
-		var q string
-		if len(keywords) > 0 {
-			q = fmt.Sprintf("Pack = %s AND Keywords = (%s)", packName, strings.Join(keywords, " OR "))
-		} else {
-			q = fmt.Sprintf("Pack = %s", packName)
+	// open gifs index
+	gIndex, err := search.Open(gifsIndex)
+	if err != nil {
+		return nil, err
+	}
+
+	// search for matching gifs in each pack
+	var q, packValues string
+	if len(packs) > 1 {
+		packValues = fmt.Sprintf("(%s)", strings.Join(packs, " OR "))
+	} else {
+		packValues = packs[0]
+	}
+
+	if len(keywords) > 0 {
+		q = fmt.Sprintf("Pack = %s AND Keywords = (%s)", packValues, strings.Join(keywords, " OR "))
+	} else {
+		q = fmt.Sprintf("Pack = %s", packValues)
+	}
+
+	for t := gIndex.Search(ctx, q, nil); ; {
+		var gif Gif
+		_, err := t.Next(&gif)
+		if err != nil {
+			if err == search.Done {
+				break
+			} else {
+				return nil, err
+			}
 		}
+
+		results = append(results, gif)
+	}
+
+	return results, nil
+}
 
 		for t := gIndex.Search(ctx, q, nil); ; {
 			var gif Gif
