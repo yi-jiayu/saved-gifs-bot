@@ -1,11 +1,11 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/search"
@@ -32,6 +32,7 @@ var (
 	ErrInvalidName = errors.New("invalid name")
 	ErrNotAllowed  = errors.New("not allowed")
 	ErrNotFound    = errors.New("pack not found")
+	ErrDeleted     = errors.New("pack deleted")
 )
 
 // Gif represents a gif in our search index
@@ -46,6 +47,7 @@ type Pack struct {
 	Name         string
 	Creator      int
 	Contributors []int
+	Deleted      bool
 }
 
 // Subscription represents a subscription to a gif pack in datastore
@@ -68,11 +70,9 @@ func NewPack(ctx context.Context, packName string, creator int) (bool, error) {
 	}
 
 	// check if pack name is already taken
-	var pack Pack
-	key := datastore.NewKey(ctx, packKind, strings.ToUpper(packName), 0, nil)
-	err := datastore.Get(ctx, key, &pack)
+	pack, err := GetPack(ctx, packName)
 	if err != nil {
-		if err != datastore.ErrNoSuchEntity {
+		if err != ErrNotFound {
 			return false, err
 		}
 	} else {
@@ -84,6 +84,7 @@ func NewPack(ctx context.Context, packName string, creator int) (bool, error) {
 		Creator: creator,
 	}
 
+	key := datastore.NewKey(ctx, packKind, strings.ToUpper(packName), 0, nil)
 	_, err = datastore.Put(ctx, key, &pack)
 	if err != nil {
 		return false, err
@@ -95,14 +96,20 @@ func NewPack(ctx context.Context, packName string, creator int) (bool, error) {
 // GetUserPacks returns a UserPacks struct representing the packs a user has created and is a contributor to
 func GetUserPacks(ctx context.Context, userID int) (UserPacks, error) {
 	var isCreator []Pack
-	q1 := datastore.NewQuery(packKind).Filter("Creator =", userID)
+	q1 := datastore.
+		NewQuery(packKind).
+		Filter("Creator =", userID).
+		Filter("Deleted = ", false)
 	_, err := q1.GetAll(ctx, &isCreator)
 	if err != nil {
 		return UserPacks{}, err
 	}
 
 	var isContributor []Pack
-	q2 := datastore.NewQuery(packKind).Filter("Contributors =", userID)
+	q2 := datastore.
+		NewQuery(packKind).
+		Filter("Contributors =", userID).
+		Filter("Deleted = ", false)
 	_, err = q2.GetAll(ctx, &isContributor)
 	if err != nil {
 		return UserPacks{}, err
@@ -132,6 +139,10 @@ func GetPack(ctx context.Context, packName string) (Pack, error) {
 		}
 
 		return Pack{}, err
+	}
+
+	if pack.Deleted {
+		return pack, ErrDeleted
 	}
 
 	return pack, nil
@@ -322,7 +333,17 @@ func MySubscriptions(ctx context.Context, user int) ([]Subscription, error) {
 		return nil, err
 	}
 
-	return subscriptions, nil
+	// todo: use datastore.GetMulti
+	var mysubs []Subscription
+	for _, sub := range subscriptions {
+		_, err := GetPack(ctx, sub.Pack)
+		if err != nil {
+			continue
+		}
+		mysubs = append(mysubs, sub)
+	}
+
+	return mysubs, nil
 }
 
 // GetGif is a convenience wrapper to get a gif by packName and fileID from the search index
@@ -598,6 +619,36 @@ func SearchGifs(ctx context.Context, user int, query string) ([]Gif, error) {
 	}
 
 	return results, nil
+}
+
+// SoftDeletePack sets a pack as deleted but does not remove the data yet.
+func SoftDeletePack(ctx context.Context, packName string, userID int) (bool, error) {
+	// validate pack name
+	if !packNameRegex.MatchString(packName) {
+		return false, ErrInvalidName
+	}
+
+	// normalise pack name
+	packName = strings.ToUpper(packName)
+
+	// check that user is the creator of pack
+	pack, err := GetPack(ctx, packName)
+	if err != nil {
+		return false, err
+	}
+
+	if pack.Creator != userID {
+		return false, ErrNotAllowed
+	}
+
+	pack.Deleted = true
+
+	err = SetPack(ctx, &pack)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 func DeletePack(ctx context.Context, packName string, userID int) (bool, error) {

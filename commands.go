@@ -190,10 +190,14 @@ func cmdUnsubscribeHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *t
 	if packName := message.CommandArguments(); packName != "" {
 		unsubscribed, err := Unsubscribe(ctx, packName, userID)
 		if err != nil {
-			if err == ErrInvalidName {
+			switch err {
+			case ErrInvalidName:
 				text = "Oh no! That was not a valid pack name. Pack names can only contain letter, numbers, hyphens and underscores."
 				done = true
-			} else {
+			case ErrDeleted:
+				text = "Whoops, that pack has already been deleted."
+				done = true
+			default:
 				return err
 			}
 		} else {
@@ -279,10 +283,14 @@ func cmdNewGifHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbota
 	if packName != "" {
 		pack, err := GetPack(ctx, packName)
 		if err != nil {
-			if err == ErrNotFound {
+			switch err {
+			case ErrNotFound:
 				text := "Oh no! That pack does not exist. Did you spell it correctly?"
 				reply = tgbotapi.NewMessage(chatID, text)
-			} else {
+			case ErrDeleted:
+				text := "Whoops, that entire gif pack was deleted already."
+				reply = tgbotapi.NewMessage(chatID, text)
+			default:
 				return err
 			}
 		} else {
@@ -349,10 +357,14 @@ func cmdDeleteGifHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgb
 	if packName := message.CommandArguments(); packName != "" {
 		_, err := GetPack(ctx, packName)
 		if err != nil {
-			if err == ErrNotFound {
+			switch err {
+			case ErrNotFound:
 				text = "Oops! There doesn't seem to be any gif pack with that name."
 				done = true
-			} else {
+			case ErrDeleted:
+				text = "Whoops, that entire gif pack was deleted already."
+				done = true
+			default:
 				return err
 			}
 		} else {
