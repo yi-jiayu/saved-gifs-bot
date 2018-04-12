@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/yi-jiayu/telegram-bot-api"
+	"github.com/go-telegram-bot-api/telegram-bot-api"
 	"golang.org/x/net/context"
 )
 
@@ -17,6 +17,7 @@ var commandHandlers = map[string]MessageHandler{
 	"deletegif":     cmdDeleteGifHandler,
 	"version":       cmdVersionHandler,
 	"cancel":        cmdCancelHandler,
+	"deletepack":    cmdDeletePackHandler,
 }
 
 // MessageHandler represents a function which handles an incoming message.
@@ -288,7 +289,7 @@ func cmdNewGifHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbota
 				text := "Oh no! That pack does not exist. Did you spell it correctly?"
 				reply = tgbotapi.NewMessage(chatID, text)
 			case ErrDeleted:
-				text := "Whoops, that entire gif pack was deleted already."
+				text := "Whoops, that gif pack has been deleted."
 				reply = tgbotapi.NewMessage(chatID, text)
 			default:
 				return err
@@ -362,7 +363,7 @@ func cmdDeleteGifHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgb
 				text = "Oops! There doesn't seem to be any gif pack with that name."
 				done = true
 			case ErrDeleted:
-				text = "Whoops, that entire gif pack was deleted already."
+				text = "Whoops, that gif pack has been deleted."
 				done = true
 			default:
 				return err
@@ -396,6 +397,60 @@ func cmdDeleteGifHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgb
 
 	if !message.Chat.IsPrivate() {
 		reply.ReplyToMessageID = message.MessageID
+		if !done {
+			reply.ReplyMarkup = tgbotapi.ForceReply{
+				ForceReply: true,
+				Selective:  true,
+			}
+		}
+	}
+
+	_, err := bot.Send(reply)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func cmdDeletePackHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
+	userID := message.From.ID
+	chatID := message.Chat.ID
+
+	var text string
+	done := false
+	if name := message.CommandArguments(); name != "" {
+		err := SoftDeletePack(ctx, name, userID)
+		if err != nil {
+			if err == ErrInvalidName {
+				text = "Oh no! That was not a valid pack name. A pack name can only contain letters, numbers, hyphens and underscores."
+				done = true
+			} else {
+				return err
+			}
+		} else {
+			text = "Great! Your gif pack has been deleted."
+			done = true
+		}
+	} else {
+		text = "What is the name of the gif pack you want to delete?"
+	}
+
+	if !done {
+		state := ConversationState{
+			State: stateDeletePackWaitPackName,
+		}
+
+		err := SetConversationState(ctx, chatID, userID, state)
+		if err != nil {
+			return err
+		}
+	}
+
+	reply := tgbotapi.NewMessage(chatID, text)
+	if !message.Chat.IsPrivate() {
+		reply.ReplyToMessageID = message.MessageID
+
 		if !done {
 			reply.ReplyMarkup = tgbotapi.ForceReply{
 				ForceReply: true,

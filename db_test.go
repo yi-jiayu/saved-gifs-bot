@@ -575,20 +575,17 @@ func TestSoftDeletePack(t *testing.T) {
 	}
 
 	t.Run("invalid name", func(t *testing.T) {
-		ok, err := SoftDeletePack(ctx, "!@#$%", 0)
-		assert.False(t, ok)
+		err := SoftDeletePack(ctx, "!@#$%", 0)
 		assert.Equal(t, err, ErrInvalidName)
 	})
 
 	t.Run("not creator", func(t *testing.T) {
-		ok, err := SoftDeletePack(ctx, pack1.Name, 0)
-		assert.False(t, ok)
+		err := SoftDeletePack(ctx, pack1.Name, 0)
 		assert.Equal(t, err, ErrNotAllowed)
 	})
 
 	t.Run("ok", func(t *testing.T) {
-		ok, err := SoftDeletePack(ctx, pack1.Name, 1)
-		assert.True(t, ok)
+		err := SoftDeletePack(ctx, pack1.Name, 1)
 		assert.Equal(t, err, nil)
 
 		pack, err := GetPack(ctx, pack1.Name)

@@ -2,7 +2,7 @@ package main
 
 import (
 	"errors"
-	"github.com/yi-jiayu/telegram-bot-api"
+	"github.com/go-telegram-bot-api/telegram-bot-api"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/search"
 )
@@ -18,6 +18,7 @@ const (
 	stateUnsubscribeWaitPackName
 	stateDeleteGifWaitPackName
 	stateDeleteGifWaitGif
+	stateDeletePackWaitPackName
 )
 
 // Transducers is a map associating states with their respective Transducer
@@ -30,6 +31,7 @@ var Transducers = map[int]Transducer{
 	stateUnsubscribeWaitPackName: unsubscribeWaitPackNameTransducer,
 	stateDeleteGifWaitPackName:   deleteGifWaitPackNameTransduce,
 	stateDeleteGifWaitGif:        deleteGifWaitGifTransducer,
+	stateDeletePackWaitPackName:  deletePackWaitPackNameTransducer,
 }
 
 // State errors
@@ -268,6 +270,54 @@ func newPackWaitPackNameTransducer(ctx context.Context, bot *tgbotapi.BotAPI, me
 		}
 	} else {
 		text = "Oops! I was waiting for you to send me a name for your new gif pack."
+		nextState = state
+	}
+
+	chatID := message.Chat.ID
+	reply := tgbotapi.NewMessage(chatID, text)
+	if !message.Chat.IsPrivate() {
+		reply.ReplyToMessageID = message.MessageID
+
+		if nextState.State != stateNone {
+			reply.ReplyMarkup = tgbotapi.ForceReply{
+				ForceReply: true,
+				Selective:  true,
+			}
+		}
+	}
+
+	action := func() error {
+		_, err := bot.Send(reply)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	return nextState, action, nil
+}
+
+func deletePackWaitPackNameTransducer(ctx context.Context, bot *tgbotapi.BotAPI, message *tgbotapi.Message, state ConversationState) (ConversationState, func() error, error) {
+	userID := message.From.ID
+
+	var nextState ConversationState
+	var text string
+	if packName := message.Text; packName != "" {
+		err := SoftDeletePack(ctx, packName, userID)
+		if err != nil {
+			if err == ErrInvalidName {
+				text = "Oh no! That was not a valid pack name. A pack name can only contain letters, numbers, hyphens and underscores."
+				nextState = state
+			} else {
+				return state, nil, err
+			}
+		} else {
+			text = "That gif pack has been deleted."
+			nextState = ConversationState{}
+		}
+	} else {
+		text = "Oops! I was waiting for you to send me the name of the gif pack you wished to delete."
 		nextState = state
 	}
 

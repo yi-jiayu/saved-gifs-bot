@@ -622,10 +622,10 @@ func SearchGifs(ctx context.Context, user int, query string) ([]Gif, error) {
 }
 
 // SoftDeletePack sets a pack as deleted but does not remove the data yet.
-func SoftDeletePack(ctx context.Context, packName string, userID int) (bool, error) {
+func SoftDeletePack(ctx context.Context, packName string, userID int) error {
 	// validate pack name
 	if !packNameRegex.MatchString(packName) {
-		return false, ErrInvalidName
+		return ErrInvalidName
 	}
 
 	// normalise pack name
@@ -634,21 +634,21 @@ func SoftDeletePack(ctx context.Context, packName string, userID int) (bool, err
 	// check that user is the creator of pack
 	pack, err := GetPack(ctx, packName)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	if pack.Creator != userID {
-		return false, ErrNotAllowed
+		return ErrNotAllowed
 	}
 
 	pack.Deleted = true
 
 	err = SetPack(ctx, &pack)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return true, nil
+	return nil
 }
 
 func DeletePack(ctx context.Context, packName string, userID int) (bool, error) {

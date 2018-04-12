@@ -1,5 +1,9 @@
 # Change Log
 
+## v0.3.0 - 2018-04-12
+### Added
+- Added `/deletepack` command to delete gif packs
+
 ## v0.2.2 - 2017-05-11
 ### Changed
 - Directly check for the existence of and delete subscriptions by key rather than a filter query

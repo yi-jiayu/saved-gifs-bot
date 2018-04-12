@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/yi-jiayu/telegram-bot-api"
+	"github.com/go-telegram-bot-api/telegram-bot-api"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/log"
 )
