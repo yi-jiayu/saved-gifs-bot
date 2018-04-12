@@ -9,7 +9,7 @@ import (
 
 // states
 const (
-	stateNone = iota
+	stateNone                    = iota
 	stateNewGifWaitPackName
 	stateNewGifWaitGif
 	stateNewGifWaitKeywords
@@ -306,10 +306,14 @@ func deletePackWaitPackNameTransducer(ctx context.Context, bot *tgbotapi.BotAPI,
 	if packName := message.Text; packName != "" {
 		err := SoftDeletePack(ctx, packName, userID)
 		if err != nil {
-			if err == ErrInvalidName {
+			switch err {
+			case ErrInvalidName:
 				text = "Oh no! That was not a valid pack name. A pack name can only contain letters, numbers, hyphens and underscores."
 				nextState = state
-			} else {
+			case ErrNotFound:
+				text = "Oops, that gif pack doesn't exist. Did you type it in wrongly?"
+				nextState = state
+			default:
 				return state, nil, err
 			}
 		} else {

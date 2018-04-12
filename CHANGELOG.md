@@ -1,5 +1,9 @@
 # Change Log
 
+## v0.3.1 - 2018-04-12
+### Fixed
+- Fixed an error when trying to delete a nonexistent gif pack
+
 ## v0.3.0 - 2018-04-12
 ### Added
 - Added `/deletepack` command to delete gif packs

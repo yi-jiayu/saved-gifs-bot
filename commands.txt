@@ -1,0 +1,10 @@
+newpack - [name] Create a new gif pack
+mypacks - List gif packs you created or can contribute to
+deletepack - [name] Delete a gif pack
+newgif - [pack_name] Add a new gif to a pack
+deletegif - [pack_name] Delete a gif from a pack
+sub - [name] Subscribe to a gif pack
+unsub - [name] Unsubscribe from a gif pack
+mysubs - List gif packs you are subscribed to
+version - View current Saved GIFs Bot version
+cancel - Cancel the current command

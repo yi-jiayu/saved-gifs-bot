@@ -10,14 +10,17 @@ import (
 var commandHandlers = map[string]MessageHandler{
 	"newpack":       cmdNewPackHandler,
 	"mypacks":       cmdMyPacksHandler,
-	"subscribe":     cmdSubscribeHandler,
-	"unsubscribe":   cmdUnsubscribeHandler,
-	"subscriptions": cmdSubscriptionsHandler,
+	"deletepack":    cmdDeletePackHandler,
 	"newgif":        cmdNewGifHandler,
 	"deletegif":     cmdDeleteGifHandler,
+	"subscribe":     cmdSubscribeHandler,
+	"sub":           cmdSubscribeHandler,
+	"unsubscribe":   cmdUnsubscribeHandler,
+	"unsub":         cmdUnsubscribeHandler,
+	"subscriptions": cmdSubscriptionsHandler,
+	"mysubs":        cmdSubscriptionsHandler,
 	"version":       cmdVersionHandler,
 	"cancel":        cmdCancelHandler,
-	"deletepack":    cmdDeletePackHandler,
 }
 
 // MessageHandler represents a function which handles an incoming message.
@@ -422,10 +425,14 @@ func cmdDeletePackHandler(ctx context.Context, bot *tgbotapi.BotAPI, message *tg
 	if name := message.CommandArguments(); name != "" {
 		err := SoftDeletePack(ctx, name, userID)
 		if err != nil {
-			if err == ErrInvalidName {
+			switch err {
+			case ErrInvalidName:
 				text = "Oh no! That was not a valid pack name. A pack name can only contain letters, numbers, hyphens and underscores."
 				done = true
-			} else {
+			case ErrNotFound:
+				text = "Oops, that gif pack doesn't exist. Did you type it in wrongly?"
+				done = true
+			default:
 				return err
 			}
 		} else {
